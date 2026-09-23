@@ -1,0 +1,1480 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>กิลด์นักผจญภัย: REST vs GraphQL</title>
+<meta name="description" content="เกมจำลอง REST vs GraphQL สไตล์ RPG ให้คนในห้องทายผลผ่านมือถือ">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@300;400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#f4ead6; --bg2:#efe1c4; --ink:#2a2440; --muted:#6d6581; --card:#fffaf0; --line:#e2d1ad;
+  --rest:#e8553e; --rest-soft:#fde3dd; --gql:#cf2f86; --gql-soft:#fbe0ef; --tie:#d99a12; --tie-soft:#fbefcf;
+  --gold:#f2b631; --ok:#23915f; --bad:#d64545; --shadow:0 6px 0 rgba(90,60,20,.12), 0 14px 30px rgba(90,60,20,.10);
+  --font:'Mitr', 'Noto Sans Thai', system-ui, sans-serif; --mono:'JetBrains Mono', ui-monospace, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--font); color:var(--ink); background:var(--bg); font-weight:400;
+  background-image:radial-gradient(circle at 20% 10%, rgba(255,255,255,.55), transparent 40%), radial-gradient(circle at 90% 90%, rgba(242,182,49,.12), transparent 45%);}
+button{font-family:inherit; cursor:pointer}
+.hidden{display:none !important}
+.btn{border:0; border-radius:14px; padding:.7em 1.2em; font-size:1rem; font-weight:500; background:var(--ink); color:#fff; box-shadow:0 4px 0 rgba(0,0,0,.25); transition:transform .08s}
+.btn:active{transform:translateY(3px); box-shadow:0 1px 0 rgba(0,0,0,.25)}
+.btn.ghost{background:transparent; color:var(--ink); box-shadow:none; border:2px solid var(--line)}
+.warn{background:#fff3cd; border:2px solid #efd27a; color:#6b4e00; border-radius:12px; padding:.5em .8em; font-size:.95em}
+
+/* ---------- landing ---------- */
+.landing{min-height:100dvh; display:grid; place-items:center; padding:16px}
+.landing .card{background:var(--card); border:2px solid var(--line); border-radius:22px; padding:28px; max-width:520px; width:100%; box-shadow:var(--shadow); text-align:center}
+.landing h1{margin:.2em 0; font-size:28px; font-weight:600}
+.landing p{color:var(--muted)}
+.landing .row{display:flex; gap:10px; margin-top:14px}
+.landing input{flex:1; min-width:0; font:inherit; font-size:22px; letter-spacing:.2em; text-transform:uppercase; text-align:center; padding:.5em; border-radius:12px; border:2px solid var(--line); background:#fff}
+.crest{font-size:44px}
+
+/* ---------- host ---------- */
+body.host{height:100vh; overflow:hidden; display:grid; grid-template-rows:auto 1fr auto}
+.topbar{display:flex; align-items:center; gap:1.2vw; padding:.7vw 1.4vw}
+.logo{display:flex; align-items:center; gap:.6vw}
+.logo .crest{font-size:2.4vw}
+.logo b{font-size:1.55vw; font-weight:600; display:block; line-height:1.1}
+.logo span{font-size:.95vw; color:var(--muted)}
+.progress{display:flex; gap:.5vw; margin-left:auto; align-items:center}
+.progress i{width:2.1vw; height:2.1vw; border-radius:50%; display:grid; place-items:center; font-style:normal; font-size:.95vw; background:var(--bg2); color:var(--muted); border:2px solid var(--line); font-weight:600}
+.progress i.on{background:var(--gold); color:var(--ink); border-color:#c98f14; transform:scale(1.12)}
+.progress i.done{background:var(--ink); color:#fff; border-color:var(--ink)}
+.roombox{display:flex; align-items:center; gap:.8vw; background:var(--card); border:2px solid var(--line); border-radius:14px; padding:.35vw .8vw}
+.roombox .code{font-size:1.5vw; font-weight:600; letter-spacing:.12em}
+.roombox small{display:block; color:var(--muted); font-size:.75vw}
+.roombox .mini-qr{width:3.6vw; height:3.6vw; background:#fff; border-radius:6px; padding:3px}
+.roombox .mini-qr img,.roombox .mini-qr canvas{width:100% !important; height:100% !important}
+.people{font-size:1.2vw; font-weight:500}
+.dot{display:inline-block; width:.7vw; height:.7vw; border-radius:50%; background:#aaa; margin-right:.3vw; vertical-align:middle}
+.dot.ok{background:var(--ok)} .dot.wait{background:var(--gold)} .dot.local{background:#8a84a0}
+
+.stage{display:grid; grid-template-columns:minmax(300px, 31vw) 1fr; gap:1.1vw; padding:0 1.4vw .6vw; min-height:0}
+.panel{background:var(--card); border:2px solid var(--line); border-radius:20px; padding:1.3vw 1.4vw; box-shadow:var(--shadow); overflow:auto; min-height:0; display:flex; flex-direction:column; gap:.9vw}
+.panel .kicker{font-size:.95vw; color:var(--muted); font-weight:500; letter-spacing:.02em}
+.panel h2{margin:0; font-size:2vw; line-height:1.2; font-weight:600}
+.panel .need{font-size:1.2vw; line-height:1.45; background:var(--bg2); border-radius:12px; padding:.7vw .9vw}
+.netchip{display:inline-flex; gap:.4vw; align-items:center; font-size:.95vw; background:#e8f1ff; color:#23456e; border-radius:999px; padding:.2vw .8vw; align-self:flex-start}
+.codes{display:grid; gap:.6vw}
+.codebox{border-radius:12px; overflow:hidden; border:2px solid}
+.codebox .cap{font-size:.9vw; font-weight:600; padding:.25vw .7vw; color:#fff}
+.codebox pre{margin:0; padding:.6vw .8vw; font-family:var(--mono), var(--font); font-size:.92vw; line-height:1.45; white-space:pre-wrap; background:#fff}
+.codebox.rest{border-color:var(--rest)} .codebox.rest .cap{background:var(--rest)}
+.codebox.gql{border-color:var(--gql)} .codebox.gql .cap{background:var(--gql)}
+.codebox .note{font-size:.85vw; color:var(--muted); padding:0 .8vw .5vw; background:#fff}
+.timer{display:flex; align-items:center; gap:1vw; margin-top:auto}
+.ring{--p:1; width:5vw; height:5vw; border-radius:50%; display:grid; place-items:center; font-size:1.8vw; font-weight:600;
+  background:conic-gradient(var(--gold) calc(var(--p)*360deg), var(--bg2) 0); position:relative}
+.ring::before{content:""; position:absolute; inset:.45vw; background:var(--card); border-radius:50%}
+.ring span{position:relative}
+.timer .txt{font-size:1.15vw; line-height:1.35}
+.timer .txt b{font-size:1.5vw}
+.hint{font-size:.9vw; color:var(--muted)}
+.verdict{border-radius:16px; padding:.9vw 1vw; color:#fff; font-size:1.8vw; font-weight:600; display:flex; align-items:center; gap:.7vw; animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+.verdict.rest{background:var(--rest)} .verdict.gql{background:var(--gql)} .verdict.tie{background:var(--tie)}
+.verdict small{display:block; font-size:.95vw; font-weight:400; opacity:.95}
+.dist{display:grid; gap:.35vw}
+.dist .row{display:grid; grid-template-columns:9vw 1fr 3vw; align-items:center; gap:.5vw; font-size:1vw}
+.dist .bar{height:1.3vw; border-radius:6px; background:var(--bg2); overflow:hidden}
+.dist .bar i{display:block; height:100%; width:0; transition:width .9s cubic-bezier(.2,.8,.2,1)}
+.dist .row.correct{font-weight:600}
+.dist .row.correct span:first-child::after{content:" ✓"; color:var(--ok)}
+.lesson h3{margin:0 0 .3vw; font-size:1.4vw; font-weight:600}
+.lesson p{margin:0; font-size:1.1vw; line-height:1.55}
+.extra{background:#eef6ff; border:2px dashed #9cc2ef; border-radius:12px; padding:.6vw .8vw; font-size:1vw}
+.legend-list{display:grid; gap:.55vw; font-size:1.15vw}
+.legend-list div{display:grid; grid-template-columns:2.4vw 1fr; gap:.5vw; align-items:start; line-height:1.4}
+.legend-list b{font-weight:600}
+.legend-list .ic{font-size:1.5vw}
+
+.arena{display:grid; grid-template-rows:1fr 1fr; gap:.9vw; min-height:0}
+.lane{position:relative; border-radius:20px; overflow:hidden; display:flex; flex-direction:column; min-height:0; background:#fff; border:3px solid; box-shadow:var(--shadow)}
+.lane.rest{border-color:var(--rest)} .lane.gql{border-color:var(--gql)}
+.lane-head{display:flex; align-items:center; gap:.7vw; padding:.35vw .8vw; color:#fff; flex-wrap:wrap}
+.lane.rest .lane-head{background:var(--rest)} .lane.gql .lane-head{background:var(--gql)}
+.lane-head .name{font-size:1.3vw; font-weight:600; margin-right:.4vw}
+.chips{display:flex; gap:.45vw; flex-wrap:wrap}
+.chip{display:inline-flex; align-items:baseline; gap:.3vw; background:rgba(255,255,255,.95); color:var(--ink); border-radius:10px; padding:.15vw .6vw; font-size:1.05vw}
+.chip b{font-weight:600; font-variant-numeric:tabular-nums}
+.chip small{font-size:.75vw; color:var(--muted)}
+.lane canvas{flex:1; width:100%; min-height:0; display:block}
+.crown{position:absolute; right:1vw; top:3.2vw; font-size:1.6vw; font-weight:600; background:var(--gold); color:var(--ink); padding:.3vw .9vw; border-radius:999px; box-shadow:0 4px 0 rgba(0,0,0,.15); animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
+.footer{display:flex; justify-content:space-between; padding:0 1.4vw .5vw; font-size:.8vw; color:var(--muted)}
+.footer .keys kbd{font-family:var(--mono); background:var(--card); border:1px solid var(--line); border-radius:5px; padding:0 .35vw; margin:0 .15vw}
+.navbtns{display:flex; gap:.4vw}
+.navbtns button{font-size:.85vw; padding:.3vw .8vw; border-radius:8px; border:2px solid var(--line); background:var(--card); color:var(--ink)}
+
+.overlay{position:fixed; inset:0; z-index:20; background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3vw}
+.lobby{display:grid; grid-template-columns:auto 1fr; gap:3vw; width:100%; height:100%; align-items:center}
+.lobby .left{display:flex; flex-direction:column; align-items:center; gap:1.2vw; text-align:center}
+.lobby h1{font-size:3.2vw; margin:0; font-weight:600; line-height:1.15}
+.lobby .sub{font-size:1.4vw; color:var(--muted)}
+.qr-big{background:#fff; padding:1vw; border-radius:18px; box-shadow:var(--shadow); width:min(40vh, 26vw); height:min(40vh, 26vw)}
+.qr-big img,.qr-big canvas{width:100% !important; height:100% !important}
+.joinurl{font-family:var(--mono); font-size:1vw; background:var(--card); border:2px solid var(--line); border-radius:10px; padding:.3vw .8vw; max-width:34vw; overflow-wrap:anywhere}
+.bigcode{font-size:4vw; font-weight:600; letter-spacing:.2em; line-height:1}
+.lobby .right{align-self:stretch; display:flex; flex-direction:column; gap:1vw; min-height:0}
+.lobby .count{font-size:2.2vw; font-weight:600}
+.namecloud{display:flex; flex-wrap:wrap; gap:.6vw; align-content:flex-start; overflow:hidden; flex:1}
+.namecloud span{background:var(--card); border:2px solid var(--line); border-radius:999px; padding:.3vw 1vw; font-size:1.4vw; animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+.namecloud span.bot{opacity:.7; border-style:dashed}
+.lobby .foot{display:flex; gap:1vw; align-items:center; flex-wrap:wrap}
+
+.board{width:min(70vw, 1100px)}
+.board h1{text-align:center; font-size:3vw; margin:0 0 1.5vw; font-weight:600}
+.lb-row{display:grid; grid-template-columns:3.5vw 1fr auto; align-items:center; gap:1vw; background:var(--card); border:2px solid var(--line); border-radius:16px; padding:.7vw 1.2vw; margin-bottom:.7vw; font-size:1.7vw; animation:slide .5s both}
+.lb-row .rk{font-weight:600; font-size:2vw; text-align:center}
+.lb-row .sc{font-weight:600; font-variant-numeric:tabular-nums}
+.lb-row .up{font-size:1vw; color:var(--ok); margin-left:.6vw}
+.podium{display:flex; align-items:flex-end; justify-content:center; gap:1.5vw; margin-top:2vw}
+.pod{display:flex; flex-direction:column; align-items:center; gap:.6vw; width:16vw}
+.pod .nm{font-size:1.8vw; font-weight:600; text-align:center; overflow-wrap:anywhere}
+.pod .ps{font-size:1.3vw; color:var(--muted)}
+.pod .blk{width:100%; border-radius:16px 16px 0 0; display:grid; place-items:center; font-size:4vw; font-weight:600; color:#fff; box-shadow:var(--shadow); animation:rise .9s cubic-bezier(.2,1.2,.3,1) both}
+.pod.p1 .blk{height:22vh; background:linear-gradient(#f7c948,#e0a310)} .pod.p2 .blk{height:15vh; background:linear-gradient(#c9d3e3,#96a3b8)} .pod.p3 .blk{height:11vh; background:linear-gradient(#e7a877,#c47b41)}
+.rest-list{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:.4vw 2vw; margin-top:2vw; width:min(60vw,900px); font-size:1.3vw}
+.rest-list div{display:flex; justify-content:space-between; border-bottom:1px dashed var(--line); padding:.2vw 0}
+.take{width:min(82vw,1300px); text-align:center}
+.take h1{font-size:3.6vw; margin:0; font-weight:600; line-height:1.2}
+.take .sub{font-size:2.1vw; margin:1vw 0 2vw; line-height:1.4}
+.take .sub mark{background:linear-gradient(transparent 55%, #f7d77a 55%); color:inherit; padding:0 .2em}
+.take .sub2{font-size:1.35vw; color:var(--muted); margin-top:2vw; line-height:1.5}
+.sumgrid{display:grid; grid-template-columns:repeat(5, 1fr); gap:1vw; text-align:left}
+.sum{background:var(--card); border:2px solid var(--line); border-radius:16px; padding:1vw; animation:slide .5s both}
+.sum .qn{font-size:.95vw; color:var(--muted)}
+.sum .qt{font-size:1.25vw; font-weight:600; margin:.2vw 0 .5vw; line-height:1.3}
+.sum .wn{display:inline-block; color:#fff; border-radius:999px; padding:.1vw .7vw; font-size:1vw; font-weight:500}
+.sum .ls{font-size:1vw; line-height:1.45; margin-top:.5vw}
+.wn.rest{background:var(--rest)} .wn.gql{background:var(--gql)} .wn.tie{background:var(--tie)}
+#confetti{position:fixed; inset:0; pointer-events:none; z-index:30}
+
+@keyframes pop{0%{transform:scale(.6); opacity:0} 100%{transform:scale(1); opacity:1}}
+@keyframes slide{0%{transform:translateY(14px); opacity:0} 100%{transform:none; opacity:1}}
+@keyframes rise{0%{transform:scaleY(0); transform-origin:bottom} 100%{transform:scaleY(1); transform-origin:bottom}}
+
+/* ---------- player (phone) ---------- */
+body.player{min-height:100dvh; display:flex; flex-direction:column; padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+.p-top{display:flex; justify-content:space-between; align-items:center; font-size:14px; color:var(--muted); gap:8px}
+.p-top .me{font-weight:500; color:var(--ink); background:var(--card); border:2px solid var(--line); border-radius:999px; padding:4px 12px; max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.p-main{flex:1; display:flex; flex-direction:column; justify-content:center; gap:14px; padding:10px 0}
+.p-card{background:var(--card); border:2px solid var(--line); border-radius:22px; padding:20px; box-shadow:var(--shadow); text-align:center}
+.p-card h2{margin:.2em 0; font-size:24px; font-weight:600; line-height:1.3}
+.p-card p{margin:.4em 0; color:var(--muted); font-size:16px; line-height:1.5}
+.p-big{font-size:56px; line-height:1}
+.p-input{width:100%; font:inherit; font-size:22px; padding:14px; border-radius:14px; border:2px solid var(--line); background:#fff; text-align:center; margin:12px 0}
+.p-go{width:100%; font-size:22px; padding:16px; border-radius:16px}
+.choices{display:grid; gap:12px}
+.choice{border:0; border-radius:20px; padding:22px 16px; font-size:26px; font-weight:600; color:#fff; display:flex; align-items:center; gap:14px; box-shadow:0 6px 0 rgba(0,0,0,.2); text-align:left}
+.choice:active{transform:translateY(4px); box-shadow:0 2px 0 rgba(0,0,0,.2)}
+.choice small{display:block; font-size:14px; font-weight:400; opacity:.95}
+.choice .ic{font-size:34px}
+.choice.rest{background:var(--rest)} .choice.gql{background:var(--gql)} .choice.tie{background:var(--tie)}
+.p-timer{font-size:15px; color:var(--muted); text-align:center}
+.p-timer b{color:var(--ink); font-size:20px}
+.p-res.ok{background:#e3f6ec; border-color:#8fd3b0} .p-res.bad{background:#fde7e7; border-color:#efa3a3}
+.p-score{font-size:40px; font-weight:600}
+.p-rank{font-size:18px}
+.p-foot{font-size:12px; color:var(--muted); text-align:center}
+
+/* =====================================================================
+   STARDEW SKIN  (ชุดสีและกรอบเดียวกับสไลด์)
+   ===================================================================== */
+:root{
+  --bg:#15192e; --bg2:#f7b870; --ink:#3a1e17; --muted:#6b3a1e; --card:#fabc72; --line:#d68f54;
+  --hi:#ffe4a1; --night:#15192e; --night-ink:#ffe4a1; --night-muted:#d9c49a;
+  --rest:#e8553e; --rest-soft:#fbd3c6; --gql:#b8336a; --gql-soft:#f3c6d8; --tie:#dc7b05; --tie-soft:#ffe4a1;
+  --gold:#ffc53d; --ok:#3f9b3a; --bad:#d64545;
+  --shadow:none;
+  --pix:'TA 16 Bit', 'Mitr', 'Noto Sans Thai', system-ui, sans-serif;
+  /* กรอบไม้ 4 ชั้น + เงาแข็ง (ไม่กินพื้นที่ layout) */
+  --wood: 0 0 0 .2vw #d68f54, 0 0 0 .4vw #853605, 0 0 0 .6vw #dc7b05, 0 0 0 .8vw #5b2b2a, .45vw .45vw 0 .8vw #0b0d18;
+  --wood-px: 0 0 0 3px #d68f54, 0 0 0 6px #853605, 0 0 0 9px #dc7b05, 0 0 0 12px #5b2b2a, 7px 7px 0 12px #0b0d18;
+  --slot: inset .18vw .18vw 0 #ffe4a1;
+  --slot-px: inset 3px 3px 0 #ffe4a1;
+}
+*,*::before,*::after{border-radius:0 !important}
+body{background:var(--night); background-image:none}
+
+/* ฟอนต์พิกเซลสำหรับหัวข้อ ตัวเลข และป้าย (เครื่องที่ไม่มี TA 16 Bit จะใช้ Mitr แทน) */
+h1,h2,h3,.logo b,.bigcode,.roombox .code,.lane-head .name,.verdict,.progress i,.lobby .count,
+.pod .blk,.pod .nm,.lb-row .rk,.p-score,.p-card h2,.crown,.ring span,.timer .txt b,.chip b{font-family:var(--pix)}
+
+/* ---------- ปุ่ม ---------- */
+.btn{background:#5b2b2a; color:#ffe4a1; box-shadow:0 .25em 0 #0b0d18}
+.btn:active{box-shadow:0 .08em 0 #0b0d18}
+.btn.ghost{background:#ffe4a1; color:var(--ink); border:2px solid #853605; box-shadow:0 .25em 0 #0b0d18}
+.warn{background:#ffe4a1; border:2px solid #dc7b05; color:var(--ink)}
+
+/* ---------- landing ---------- */
+.landing .card{border:0; box-shadow:var(--wood-px); background:var(--card)}
+.landing input{border:2px solid #853605; background:#ffe4a1}
+
+/* ---------- host: แถบบน / ล่าง อยู่บนพื้นกลางคืน ---------- */
+.topbar{padding:1.1vw 1.8vw .9vw}
+.logo b{color:var(--night-ink)} .logo span{color:var(--night-muted)}
+.people{color:var(--night-ink)}
+.progress i{border-radius:0; background:#f7b870; color:var(--ink); border:2px solid #853605; box-shadow:var(--slot)}
+.progress i.on{background:var(--gold); border-color:#5b2b2a}
+.progress i.done{background:#5b2b2a; color:#ffe4a1; border-color:#5b2b2a; box-shadow:none}
+.roombox{border:0; box-shadow:var(--wood)}
+.stage{gap:2.2vw; padding:1.1vw 1.8vw 1.5vw}
+.panel{border:0; box-shadow:var(--wood); background:var(--card)}
+.panel .need{background:#f7b870; box-shadow:var(--slot)}
+.netchip{background:#ffe4a1; color:var(--ink); border:2px solid #d68f54}
+.codebox{border:0; box-shadow:0 0 0 .15vw #5b2b2a}
+.codebox pre{background:#2e1a16; color:#ffe4a1}
+.codebox .note{background:#ffe4a1}
+.extra{background:#ffe4a1; border:2px dashed #853605}
+.dist .bar{background:#f7b870}
+.dist .bar i{transition-timing-function:steps(8,end)}
+.arena{gap:2.2vw}
+.lane{border:0; box-shadow:var(--wood); background:#8fc9ee}
+.lane canvas{image-rendering:pixelated; image-rendering:crisp-edges}
+.chip{background:#ffe4a1; border:2px solid #853605}
+.crown{box-shadow:0 .25vw 0 #0b0d18; border:2px solid #5b2b2a}
+.footer{color:var(--night-muted); padding:0 1.8vw .6vw}
+.footer .keys kbd{background:#f7b870; color:var(--ink); border:2px solid #853605}
+.navbtns button{background:var(--card); color:var(--ink); border:2px solid #853605; box-shadow:0 .2vw 0 #0b0d18}
+
+/* ---------- overlay (lobby / leaderboard / takeaway / podium) ---------- */
+.overlay{background:var(--night)}
+.lobby,.board,.take{background:var(--card); box-shadow:var(--wood); padding:2vw 2.4vw}
+.lobby{height:auto; max-height:100%}
+.qr-big{box-shadow:0 0 0 .4vw #5b2b2a}
+.joinurl{background:#ffe4a1; border:2px solid #d68f54}
+.namecloud span{background:#f7b870; border:2px solid #d68f54; box-shadow:var(--slot)}
+.lb-row{background:#f7b870; border:2px solid #d68f54; box-shadow:var(--slot)}
+.sum{background:#f7b870; border:2px solid #d68f54; box-shadow:var(--slot)}
+.pod .blk{box-shadow:.4vw .4vw 0 #0b0d18}
+.pod.p1 .blk{background:#e8b52a} .pod.p2 .blk{background:#9fadc2} .pod.p3 .blk{background:#c9803f}
+.take .sub mark{background:#ffe4a1}
+
+/* การเคลื่อนไหวแบบกระตุกเป็นขั้น */
+.verdict,.crown,.namecloud span,.lb-row,.sum{animation-timing-function:steps(5,end) !important}
+.pod .blk{animation-timing-function:steps(6,end) !important}
+
+/* ---------- player (มือถือ) ---------- */
+body.player{padding:22px 22px calc(22px + env(safe-area-inset-bottom))}
+.p-top{color:var(--night-muted)}
+.p-top .me{background:#f7b870; border:2px solid #853605}
+.p-card{border:0; box-shadow:var(--wood-px); background:var(--card)}
+.p-input{border:2px solid #853605; background:#ffe4a1}
+.choice{box-shadow:0 6px 0 #0b0d18; border:2px solid #0b0d18}
+.choice:active{box-shadow:0 2px 0 #0b0d18}
+.p-timer{color:var(--night-muted)} .p-timer b{color:var(--night-ink)}
+.p-res.ok{background:#cfe8a8} .p-res.bad{background:#f4c0b4}
+.p-foot{color:var(--night-muted)}
+</style>
+</head>
+<body>
+<!-- ===== landing ===== -->
+<div id="landing" class="landing hidden">
+  <div class="card">
+    <div class="crest">⚔️</div>
+    <h1>กิลด์นักผจญภัย</h1>
+    <p>REST vs GraphQL: ใครจะทำภารกิจเสร็จก่อน?</p>
+    <div class="row"><input id="landCode" maxlength="4" placeholder="รหัสห้อง" autocomplete="off"><button class="btn" id="landJoin">เข้าเล่น</button></div>
+    <p style="margin-top:22px">หรือถ้าคุณเป็นผู้นำเสนอ</p>
+    <button class="btn ghost" id="landHost">เปิดจอหลัก (Host)</button>
+  </div>
+</div>
+
+<!-- ===== host ===== -->
+<div id="host" class="hidden" style="display:contents">
+  <header class="topbar">
+    <div class="logo"><div class="crest">⚔️</div><div><b>กิลด์นักผจญภัย</b><span>REST vs GraphQL: ใครทำภารกิจเสร็จก่อน?</span></div></div>
+    <div class="progress" id="progress"></div>
+    <div class="people"><span class="dot" id="connDot"></span><span id="peopleCount">0</span> คน</div>
+    <div class="roombox"><div class="mini-qr" id="miniQr"></div><div><small>รหัสห้อง</small><div class="code" id="roomCode">----</div></div></div>
+  </header>
+  <main class="stage">
+    <aside class="panel" id="panel"></aside>
+    <section class="arena">
+      <div class="lane rest" id="laneRest">
+        <div class="lane-head"><span class="name">🏃 ปาร์ตี้ REST</span><div class="chips"></div></div>
+        <canvas></canvas>
+      </div>
+      <div class="lane gql" id="laneGql">
+        <div class="lane-head"><span class="name">🧙 ปาร์ตี้ GraphQL</span><div class="chips"></div></div>
+        <canvas></canvas>
+      </div>
+    </section>
+  </main>
+  <footer class="footer">
+    <div class="keys"><kbd>→</kbd>/<kbd>Space</kbd> ถัดไป <kbd>←</kbd> ย้อน <kbd>R</kbd> แข่งซ้ำ <kbd>D</kbd> ใส่ DataLoader (ภารกิจ 3) <kbd>Q</kbd> QR ใหญ่ <kbd>F</kbd> เต็มจอ</div>
+    <div class="navbtns"><button id="btnPrev">← ย้อน</button><button id="btnNext">ถัดไป →</button></div>
+  </footer>
+  <div class="overlay hidden" id="ovLobby"></div>
+  <div class="overlay hidden" id="ovBoard"></div>
+  <canvas id="confetti" class="hidden"></canvas>
+</div>
+
+<!-- ===== player ===== -->
+<div id="player" class="hidden" style="display:contents">
+  <div class="p-top"><span>⚔️ ห้อง <b id="pRoom">----</b></span><span class="me" id="pMe">ยังไม่ได้ตั้งชื่อ</span></div>
+  <div class="p-main" id="pMain"></div>
+  <div class="p-foot" id="pFoot"></div>
+</div>
+<script>
+'use strict';
+/* =====================================================================
+   กิลด์นักผจญภัย: REST vs GraphQL
+   ---------------------------------------------------------------------
+   ตั้งค่าตรงนี้ก่อนใช้จริง (ดูวิธีใน README ที่ส่งมาด้วย)
+   - SUPABASE_URL / SUPABASE_ANON_KEY : จาก Supabase > Project Settings > API
+     ถ้าเว้นว่าง จะเข้า "โหมดซ้อม" เล่นกับบอทในเครื่องเดียว
+   ===================================================================== */
+const CONFIG = {
+  SUPABASE_URL: 'https://ergybklrpihqvomfwbkf.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_235s9JCixxA1OVtcn0UE6g_M19S0aD1',
+  PREDICT_SECONDS: 12,          // เวลาให้คนในห้องทาย
+  MINI_LEADERBOARD_AFTER: [],   // โชว์ Top 5 หลังภารกิจที่เท่าไหร่ ([] = ไม่โชว์)
+  RACE_TARGET_MS: 5000,         // ความยาวแอนิเมชันการแข่ง (ms จริง) ของฝั่งที่ช้ากว่า
+  PLAY_QUESTS: [0, 2],          // ภารกิจที่เล่นสด (index เริ่ม 0) ใส่ [0,1,2,3,4] ถ้าจะเล่นครบ
+  PIXEL_SIZE: 3,                // ขนาด 1 พิกเซลของฉากในเกม (หน่วย CSS px) 1 = ไม่ทำเป็นพิกเซล
+  REHEARSAL_BOTS: 12,           // จำนวนบอทในโหมดซ้อม
+};
+
+/* ---------------- helpers ---------------- */
+const $ = (s, r = document) => r.querySelector(s);
+function h(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, u) => a + (b - a) * u;
+const easeIO = u => u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+function fmtMs(ms) { if (ms == null || !isFinite(ms)) return '-'; return ms >= 1000 ? (ms / 1000).toFixed(2) + ' s' : Math.round(ms) + ' ms'; }
+function fmtKB(kb) { if (kb >= 10) return Math.round(kb) + ' KB'; return (Math.round(kb * 10) / 10) + ' KB'; }
+function randId(n = 8) { const c = 'abcdefghjkmnpqrstuvwxyz23456789'; const a = new Uint32Array(n); crypto.getRandomValues(a); let s = ''; for (let i = 0; i < n; i++) s += c[a[i] % c.length]; return s; }
+function newRoomCode() { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const a = new Uint32Array(4); crypto.getRandomValues(a); let s = ''; for (let i = 0; i < 4; i++) s += c[a[i] % c.length]; return s; }
+function cleanName(s) {
+  s = String(s || '').replace(/[\u0000-\u001f\u007f​-‏‪-‮⁠-⁩﻿]/g, '').replace(/\s+/g, ' ').trim();
+  return Array.from(s).slice(0, 16).join('');
+}
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) { } },
+};
+function seeded(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+
+/* ---------------- world geometry (lane canvas world units) ---------------- */
+const GEO = { W: 1300, H: 320, campX: 180, roadY: 262, cdnX: 380, guildL: 820, guildR: 1120, dbX: 1215, dbY: 212 };
+const GSHIFT = 300; // ตึกกิลด์/คลังวาดด้วยพิกัดเดิมแล้วเลื่อนซ้าย
+function counterXs(n) { return n === 1 ? [970] : n === 2 ? [915, 1025] : [870, 970, 1070]; }
+
+/* ---------------- network profiles ---------------- */
+const NET = {
+  g3: { rtt: 300, bw: 50, label: '📶 เน็ต 3G บนภูเขา (ช้า)' },
+  g4: { rtt: 100, bw: 1000, label: '📶 เน็ต 4G ทั่วไป' },
+  wifi: { rtt: 30, bw: 5000, label: '📶 Wi-Fi ในเมือง (เร็ว)' },
+};
+
+/* ---------------- timeline builder ----------------
+   runner seg: {t0,t1,x0,x1,carry,kb,wait}
+   server time = pre + Σ(db waves × qt) + post                                 */
+function newTL() { return { runners: [], dots: [], works: [], bubbles: [], events: [], end: 0, crowd: null }; }
+function addTrip(tl, o) {
+  const net = o.net, half = net.rtt / 2, cx = o.cx, stopX = cx - 30;
+  const tA = o.t0 + half;
+  let t = tA + (o.pre || 0);
+  let dbCount = 0;
+  for (const lv of (o.db || [])) {
+    const pool = lv.pool || 10, waves = Math.ceil(lv.n / pool);
+    for (let w = 0; w < waves; w++) {
+      const m = Math.min(pool, lv.n - w * pool);
+      for (let i = 0; i < m; i++) { tl.dots.push({ t0: t, t1: t + lv.qt, cx, i, m }); tl.events.push({ t, k: 'db', v: 1 }); dbCount++; }
+      t += lv.qt;
+    }
+  }
+  const tS = t + (o.post || 0);
+  const xfer = o.kb / net.bw * 1000;
+  const tH = tS + half + xfer;
+  const r = {
+    actor: o.actor || 'hero', type: o.type, yOff: o.yOff || 0, scale: o.scale || 1, end: tH,
+    segs: [
+      { t0: o.t0, t1: tA, x0: GEO.campX, x1: stopX, carry: o.outCarry || 'none' },
+      { t0: tA, t1: tS, x0: stopX, x1: stopX, carry: o.outCarry || 'none', wait: true },
+      { t0: tS, t1: tH, x0: stopX, x1: GEO.campX, carry: o.retCarry || 'sack', kb: o.kb },
+    ],
+  };
+  tl.runners.push(r);
+  tl.works.push({ t0: tA, t1: tS, cx });
+  tl.events.push({ t: o.t0, k: 'req', v: 1 });
+  tl.events.push({ t: tH, k: 'kb', v: o.kb });
+  if (o.bubble) tl.bubbles.push({ t0: o.t0, t1: tA + (tS - tA) * .3, text: o.bubble, runner: r });
+  tl.end = Math.max(tl.end, tH);
+  return tH;
+}
+function finalize(tl) { tl.events.sort((a, b) => a.t - b.t); return tl; }
+function tlTotals(tl) {
+  const s = { req: 0, kb: 0, db: 0 };
+  for (const e of tl.events) s[e.k] += e.v;
+  return s;
+}
+
+/* ---------------- crowd (quest 4: cache) ---------------- */
+function buildCrowd(side) {
+  const N = 1000, rnd = seeded(side === 'rest' ? 7 : 11);
+  const starts = Array.from({ length: N }, () => rnd() * 400).sort((a, b) => a - b);
+  const items = [];
+  if (side === 'rest') {
+    // CDN (ร้านสาขา) มีสำเนาอยู่แล้ว: ไป-กลับระยะใกล้ ไม่ถึงกิลด์เลย
+    const oneWay = 15;
+    for (let i = 0; i < N; i++) { const s = starts[i], a = s + oneWay, b = a, c = b + 1, d = c + oneWay + 0.5; items.push({ s, a, b, c, d, tx: GEO.cdnX, j: rnd() }); }
+  } else {
+    // POST /graphql: ร้านสาขาจำไม่ได้ ทุกคนต้องไปถึงกิลด์ กิลด์มีเสมียน 8 คน คนละ 20ms ต่อคำขอ
+    const oneWay = 50, workers = 8, svc = 20; const free = new Array(workers).fill(0);
+    for (let i = 0; i < N; i++) {
+      const s = starts[i], a = s + oneWay; let wi = 0; for (let w = 1; w < workers; w++) if (free[w] < free[wi]) wi = w;
+      const b = Math.max(a, free[wi]), c = b + svc; free[wi] = c; const d = c + oneWay + 0.5;
+      items.push({ s, a, b, c, d, tx: GEO.guildL + 30, j: rnd() });
+    }
+  }
+  const end = Math.max(...items.map(x => x.d));
+  const avg = items.reduce((p, x) => p + (x.d - x.s), 0) / N;
+  return { items, end, avg, side, guildHits: side === 'rest' ? 0 : N };
+}
+
+/* ---------------- quests ---------------- */
+const QUESTS = [
+  {
+    name: 'กระดานจัดอันดับ', title: 'ภารกิจ 1: กระดานจัดอันดับ',
+    need: 'ทำหน้า Ranking ใช้แค่ ชื่อ + เลเวล ของนักผจญภัย 50 คน', net: NET.g3,
+    counters: ['/adventurers'],
+    restCode: 'GET /adventurers\n\nได้ข้อมูลเต็มของทั้ง 50 คน\n(ชื่อ เลเวล ประวัติ ไอเทม สถิติ ฯลฯ)',
+    gqlCode: 'query {\n  adventurers(first: 50) {\n    name\n    level\n  }\n}',
+    build() {
+      const n = this.net, rest = newTL(), gql = newTL();
+      addTrip(rest, { type: 'rest', net: n, t0: 0, cx: counterXs(1)[0], db: [{ n: 1, qt: 6 }], pre: 2, post: 4, kb: 120, retCarry: 'sack', bubble: 'GET /adventurers' });
+      addTrip(gql, { type: 'gql', net: n, t0: 0, cx: counterXs(1)[0], db: [{ n: 1, qt: 6 }], pre: 3, post: 2, kb: 2, outCarry: 'scroll', retCarry: 'pouch', bubble: 'POST /graphql' });
+      return { rest: finalize(rest), gql: finalize(gql) };
+    },
+    lessonTitle: 'Over-fetching: ขอแค่ชื่อ ได้มาทั้งแฟ้มประวัติ',
+    lesson: 'REST ส่งข้อมูลเป็นชุดที่ server จัดไว้ให้แล้ว เราเลยต้องแบกทุก field กลับมา ทั้งที่ใช้จริงแค่ 2 อย่าง พอเน็ตช้า ขนาดข้อมูลก็คือเวลาที่เสียไป ส่วน GraphQL ขอเฉพาะ field ที่จะใช้ ถุงเลยเบากว่ากันมาก',
+  },
+  {
+    name: 'หน้าโปรไฟล์ฮีโร่', title: 'ภารกิจ 2: หน้าโปรไฟล์ฮีโร่',
+    need: 'ข้อมูลฮีโร่ + ภารกิจล่าสุด 5 อัน + ของรางวัลของแต่ละภารกิจ', net: NET.g4,
+    counters: ['①', '②', '③'],
+    restCode: '① GET /adventurers/7\n② GET /adventurers/7/quests\n③ GET /quests/:id/loot   × 5\n\nต้องรู้ id ภารกิจจาก ② ก่อน\nถึงจะไปขอ ③ ได้',
+    gqlCode: 'query {\n  adventurer(id: 7) {\n    name\n    quests(last: 5) {\n      title\n      loot { name }\n    }\n  }\n}',
+    build() {
+      const n = this.net, rest = newTL(), gql = newTL(), xs = counterXs(3);
+      let t = addTrip(rest, { type: 'rest', net: n, t0: 0, cx: xs[0], db: [{ n: 1, qt: 5 }], pre: 1, post: 4, kb: 2.4, retCarry: 'sack', bubble: 'GET /adventurers/7' });
+      t = addTrip(rest, { type: 'rest', net: n, t0: t, cx: xs[1], db: [{ n: 1, qt: 5 }], pre: 1, post: 4, kb: 24, retCarry: 'sack', bubble: 'GET /adventurers/7/quests' });
+      const offs = [0, -16, 16, -30, 30];
+      for (let i = 0; i < 5; i++) addTrip(rest, { type: 'rest', actor: i === 0 ? 'hero' : 'h' + i, scale: i === 0 ? 1 : .82, yOff: offs[i], net: n, t0: t, cx: xs[2], db: [{ n: 1, qt: 5 }], pre: 1, post: 4, kb: 3, retCarry: 'sack', bubble: i === 0 ? 'GET /quests/:id/loot  × 5 คน' : null });
+      addTrip(gql, { type: 'gql', net: n, t0: 0, cx: counterXs(1)[0], db: [{ n: 1, qt: 5 }, { n: 1, qt: 5 }, { n: 5, qt: 5 }], pre: 3, post: 2, kb: 1.5, outCarry: 'scroll', retCarry: 'pouch', bubble: 'POST /graphql' });
+      return { rest: finalize(rest), gql: finalize(gql) };
+    },
+    lessonTitle: 'Under-fetching + Waterfall: เดินเป็นขั้นบันได',
+    lesson: 'REST ต้องรู้ id ของภารกิจก่อน ถึงจะไปขอของรางวัลได้ เลยต้องเดินต่อกันเป็นขั้นบันได 3 ช่วง และทุกช่วงเสียเวลาเดินทางเต็มๆ ส่วน GraphQL ยื่นใบคำขอใบเดียว ให้เสมียนไปรวบรวมหลังร้านให้',
+    extra: '👀 แอบดูหลังร้านไว้นะ เสมียน GraphQL วิ่งเข้าคลังหลายรอบกว่าที่คิด...',
+  },
+  {
+    name: 'ทำเนียบทั้งกิลด์', title: 'ภารกิจ 3: ทำเนียบทั้งกิลด์',
+    need: 'นักผจญภัย 50 คน + ภารกิจของแต่ละคน (คนละ 5) + ของรางวัลของทุกภารกิจ', net: NET.wifi,
+    counters: ['/guild-roster'],
+    restCode: 'GET /guild-roster\n\nทีม backend ทำเคาน์เตอร์นี้ให้หน้านี้โดยเฉพาะ\nเขียน SQL JOIN ไว้ ดึงทีเดียวจบ',
+    gqlCode: 'query {\n  adventurers(first: 50) {\n    name\n    quests {\n      title\n      loot { name }\n    }\n  }\n}',
+    gqlNote: 'resolver เขียนแบบตรงไปตรงมา ทีละ field (เช่น Apollo Server ที่ยังไม่ใส่ DataLoader)',
+    build(variant) {
+      const n = this.net, rest = newTL(), gql = newTL(), cx = counterXs(1)[0];
+      addTrip(rest, { type: 'rest', net: n, t0: 0, cx, db: [{ n: 1, qt: 45 }], pre: 2, post: 5, kb: 30, retCarry: 'sack', bubble: 'GET /guild-roster' });
+      const db = variant === 'dataloader' ? [{ n: 1, qt: 6 }, { n: 1, qt: 14 }, { n: 1, qt: 14 }] : [{ n: 1, qt: 6 }, { n: 50, qt: 6 }, { n: 250, qt: 6 }];
+      addTrip(gql, { type: 'gql', net: n, t0: 0, cx, db, pre: 5, post: 5, kb: 30, outCarry: 'scroll', retCarry: 'sack', bubble: 'POST /graphql' });
+      return { rest: finalize(rest), gql: finalize(gql) };
+    },
+    lessonTitle: 'N+1: หน้าร้านสบาย หลังร้านจะตาย',
+    lesson: 'เดินทางรอบเดียวเท่ากัน แต่ resolver ของ GraphQL ทำงานทีละ field: หาฮีโร่ 1 ครั้ง หาภารกิจคนละครั้ง (50) หาของรางวัลภารกิจละครั้ง (250) รวม 301 ครั้ง ส่วน REST เขียน JOIN ไว้แล้ว เข้าคลังครั้งเดียว',
+    extra: '🔧 กด D เพื่อใส่ DataLoader (จดรายการก่อน แล้วเข้าคลังทีเดียว) แล้วแข่งใหม่ แก้ได้ แต่ต้องมีคนเขียนเอง',
+  },
+  {
+    name: 'บอร์ดประกาศประจำวัน', title: 'ภารกิจ 4: บอร์ดประกาศประจำวัน',
+    need: 'นักผจญภัย 1,000 คน เปิดดูบอร์ดประกาศอันเดียวกันพร้อมกันตอนเช้า', net: NET.g4,
+    counters: ['/board'], crowd: true,
+    restCode: 'GET /board\nCache-Control: max-age=60\n\nURL เดียวกันทุกคน ร้านสาขา (CDN)\nเลยเก็บสำเนาไว้ตอบแทนกิลด์ได้',
+    gqlCode: 'POST /graphql\n{ board { title reward } }\n\nทุกคำขอเป็น POST ไป URL เดียว\nร้านสาขาแยกไม่ออก เลยจำไม่ได้',
+    build() { return { rest: buildCrowd('rest'), gql: buildCrowd('gql') }; },
+    lessonTitle: 'HTTP Cache: ของที่ทุกคนขอเหมือนกัน ทำเผื่อไว้ได้',
+    lesson: 'REST ใช้ URL เป็นชื่อเมนู ร้านสาขา (CDN) กับเบราว์เซอร์เลยเก็บสำเนาไว้ตอบแทนกิลด์ได้ฟรีๆ ส่วน GraphQL ส่ง POST ไป /graphql ทุกครั้ง ตัวกลางแยกไม่ออกว่าใครขออะไร กิลด์เลยต้องรับเองครบ 1,000 คำขอ',
+    extra: '🛠 GraphQL ก็ทำ cache ได้ (persisted queries แล้วยิงเป็น GET, cache ฝั่ง client) แต่ต้องตั้งค่าเพิ่มเอง ไม่ได้มาฟรีแบบ HTTP',
+  },
+  {
+    name: 'REST ที่เขียนใบคำขอได้', title: 'ภารกิจสุดท้าย: REST ที่เขียนใบคำขอได้',
+    need: 'เหมือนภารกิจ 2 เป๊ะ (ฮีโร่ + ภารกิจ 5 อัน + ของรางวัล) แต่คราวนี้ทั้งสองฝั่งใช้ API ที่ Supabase สร้างให้', net: NET.g4,
+    counters: ['/rest/v1'],
+    restCode: 'GET /rest/v1/adventurers\n  ?id=eq.7\n  &select=name,\n     quests(title, loot(name))\n\nPostgREST: เลือก field + ดึงตารางที่\nเกี่ยวข้องมาในคำขอเดียว',
+    gqlCode: 'POST /graphql/v1\n\n(pg_graphql ของ Supabase\n แปลงทั้ง query เป็น SQL คำสั่งเดียว)',
+    build() {
+      const n = this.net, rest = newTL(), gql = newTL(), cx = counterXs(1)[0];
+      addTrip(rest, { type: 'rest', net: n, t0: 0, cx, db: [{ n: 1, qt: 8 }], pre: 2, post: 2, kb: 1.5, outCarry: 'scroll', retCarry: 'pouch', bubble: 'GET /rest/v1/…?select=' });
+      addTrip(gql, { type: 'gql', net: n, t0: 0, cx, db: [{ n: 1, qt: 8 }], pre: 3, post: 2, kb: 1.5, outCarry: 'scroll', retCarry: 'pouch', bubble: 'POST /graphql/v1' });
+      return { rest: finalize(rest), gql: finalize(gql) };
+    },
+    lessonTitle: 'เสมอ! REST ก็เลือก field และดึงข้อมูลซ้อนได้',
+    lesson: 'PostgREST ใน Supabase ให้ REST ใช้ ?select= เลือก field และดึงตารางที่เกี่ยวข้องมาในคำขอเดียว ส่วน pg_graphql ก็แปลงทั้ง query เป็น SQL คำสั่งเดียวเลยไม่มี N+1 ทั้งคู่เดินทางรอบเดียว ของเท่ากัน ความต่างเลยไม่ได้อยู่ที่ชื่อเทคโนโลยี แต่อยู่ที่ออกแบบยังไง',
+  },
+];
+QUESTS.forEach(q => { if (q.gqlCounter == null) q.gqlCounter = q.crowd ? '/graphql' : (q.counters[0] === '/rest/v1' ? '/graphql/v1' : '/graphql'); });
+
+function laneScore(r) { return r.crowd ? r.avg : r.end; }
+function sideResult(built) {
+  const isCrowd = !!built.rest.items;
+  const a = isCrowd ? built.rest.avg : built.rest.end, b = isCrowd ? built.gql.avg : built.gql.end;
+  const winner = Math.abs(a - b) / Math.max(a, b) < 0.1 ? 'tie' : (a < b ? 'rest' : 'gql');
+  return { winner, rest: a, gql: b, crowd: isCrowd };
+}
+QUESTS.forEach(q => { q.answer = sideResult(q.build()).winner; });
+const CHOICE = {
+  rest: { label: 'REST', icon: '🏃', sub: 'นักวิ่งถึงก่อน' },
+  gql: { label: 'GraphQL', icon: '🧙', sub: 'จอมเวทถึงก่อน' },
+  tie: { label: 'เสมอ', icon: '🤝', sub: 'สูสี ต่างกันไม่ถึง 10%' },
+};
+/* =====================================================================
+   RENDERER: วาดฉากกิลด์ในแต่ละเลน (canvas)
+   ===================================================================== */
+const PAL = {
+  rest: { main: '#e8553e', dark: '#b8392a', light: '#ffb49f', hair: '#3a2a2a', acc: '#ffd23f' },
+  gql: { main: '#b8336a', dark: '#6d1f45', light: '#e886b4', hair: '#f3cf6f', acc: '#ffe28a' },
+};
+const FONT = (w, px) => `${w} ${px}px "TA 16 Bit", Mitr, "Noto Sans Thai", sans-serif`;
+const MONO = px => `600 ${px}px "JetBrains Mono", ui-monospace, monospace`;
+
+function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.rect(x, y, w, h); } // มุมฉากทั้งหมด (สไตล์พิกเซล)
+// ข้อความถูกวาดทีหลังบน canvas ความละเอียดเต็ม จะได้คมแม้ฉากเป็นพิกเซล
+let LBL = null;
+function deferText(ctx, fn) { if (!LBL) return fn(ctx); LBL.push({ m: ctx.getTransform(), a: ctx.globalAlpha, fn }); }
+function circle(ctx, x, y, r, fill) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); if (fill) { ctx.fillStyle = fill; ctx.fill(); } }
+function pill(ctx, x, y, text, o = {}) { deferText(ctx, c => pillNow(c, x, y, text, o)); }
+function pillNow(ctx, x, y, text, o = {}) {
+  ctx.font = o.font || FONT(600, 18);
+  const w = ctx.measureText(text).width + (o.padX || 14) * 2, hgt = o.h || 30;
+  rr(ctx, x - w / 2, y - hgt / 2, w, hgt, hgt / 2);
+  ctx.fillStyle = o.bg || '#ffe4a1'; ctx.fill();
+  if (o.stroke) { ctx.lineWidth = o.lw || 2.5; ctx.strokeStyle = o.stroke; ctx.stroke(); }
+  ctx.fillStyle = o.color || '#3a1e17'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y + 1);
+  return w;
+}
+function sackR(kb) { return clamp(7 + 5.2 * Math.log2(1 + kb), 8, 46); }
+
+function drawHero(ctx, x, y, o) {
+  const s = o.scale || 1, f = o.facing || 1, ph = o.phase || 0, mv = !!o.moving, P = PAL[o.type];
+  ctx.save(); ctx.translate(x, y); ctx.globalAlpha = o.alpha == null ? 1 : o.alpha;
+  ctx.fillStyle = 'rgba(60,40,20,.18)'; ctx.beginPath(); ctx.ellipse(0, 0, 18 * s, 5 * s, 0, 0, Math.PI * 2); ctx.fill();
+  if (o.hop) ctx.translate(0, -o.hop);
+  ctx.scale(f * s, s);
+  const heavy = o.carry === 'sack' && o.kb >= 50;
+  const bob = mv ? Math.abs(Math.sin(ph)) * 3 : Math.sin(ph * .25) * .8;
+  const sw = mv ? Math.sin(ph) * 7 : 0;
+  ctx.fillStyle = '#3b3355';
+  rr(ctx, -8 + sw * .45, -17, 6.5, 17, 3); ctx.fill();
+  rr(ctx, 2 - sw * .45, -17, 6.5, 17, 3); ctx.fill();
+  ctx.translate(0, -bob);
+  if (heavy) ctx.rotate(.12);
+  // sack on back
+  if (o.carry === 'sack') {
+    const R = sackR(o.kb || 1), sx = -12 - R * .55, sy = -34 - R * .15;
+    ctx.fillStyle = '#b07a45'; circle(ctx, sx, sy, R); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.18)'; circle(ctx, sx - R * .3, sy - R * .3, R * .35); ctx.fill();
+    ctx.strokeStyle = '#6f4a24'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(sx + R * .2, sy - R * .9); ctx.lineTo(4, -38); ctx.stroke();
+    ctx.fillStyle = '#6f4a24'; rr(ctx, sx - 5, sy - R - 3, 10, 6, 2); ctx.fill();
+  }
+  // body
+  ctx.fillStyle = P.main;
+  ctx.beginPath(); ctx.moveTo(-13, -15); ctx.lineTo(13, -15); ctx.lineTo(9, -39); ctx.quadraticCurveTo(0, -45, -9, -39); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = P.dark; ctx.fillRect(-11, -24, 22, 3.5);
+  if (o.type === 'gql') { ctx.fillStyle = P.acc; ctx.fillRect(-2, -39, 4, 24); }
+  // hands
+  ctx.fillStyle = '#ffe3cc'; circle(ctx, 11 + sw * .3, -27, 4); ctx.fill(); circle(ctx, -11 - sw * .3, -27, 4); ctx.fill();
+  if (o.carry === 'scroll') {
+    ctx.save(); ctx.translate(15, -30); ctx.rotate(-.25);
+    ctx.fillStyle = '#fff1c9'; rr(ctx, -6, -9, 12, 18, 2); ctx.fill();
+    ctx.fillStyle = '#c9a36b'; rr(ctx, -8, -11, 16, 4, 2); ctx.fill(); rr(ctx, -8, 7, 16, 4, 2); ctx.fill();
+    ctx.strokeStyle = '#9b8a6a'; ctx.lineWidth = 1; for (let i = -4; i <= 4; i += 3) { ctx.beginPath(); ctx.moveTo(-3, i); ctx.lineTo(3, i); ctx.stroke(); }
+    ctx.restore();
+  }
+  if (o.carry === 'pouch') { ctx.fillStyle = '#a0703f'; circle(ctx, 9, -19, 6); ctx.fill(); ctx.fillStyle = '#6f4a24'; ctx.fillRect(6, -26, 6, 3); }
+  // head
+  ctx.fillStyle = '#ffe3cc'; circle(ctx, 1, -54, 16); ctx.fill();
+  ctx.fillStyle = P.hair;
+  ctx.beginPath(); ctx.arc(1, -56, 17, Math.PI * .95, Math.PI * 2.05); ctx.closePath(); ctx.fill();
+  if (o.type === 'rest') {
+    ctx.beginPath(); ctx.moveTo(-16, -58); ctx.lineTo(-20, -46); ctx.lineTo(-10, -55); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(4, -70); ctx.lineTo(16, -62); ctx.lineTo(18, -52); ctx.lineTo(10, -60); ctx.fill();
+  } else {
+    rr(ctx, -17, -60, 8, 26, 4); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(6, -70); ctx.lineTo(18, -60); ctx.lineTo(18, -48); ctx.lineTo(11, -58); ctx.fill();
+  }
+  // face
+  ctx.fillStyle = '#2a2440';
+  ctx.beginPath(); ctx.ellipse(4, -51, 2.4, 3.6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(11, -51, 2.2, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff'; circle(ctx, 4.8, -52.5, 1); ctx.fill(); circle(ctx, 11.7, -52.5, .9); ctx.fill();
+  ctx.fillStyle = 'rgba(255,120,140,.45)'; ctx.beginPath(); ctx.ellipse(12, -45, 3.5, 2, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#7a3b3b'; ctx.lineWidth = 1.4; ctx.beginPath();
+  if (heavy) { ctx.moveTo(6, -43); ctx.lineTo(10, -43); } else ctx.arc(8, -45, 2.5, .15 * Math.PI, .85 * Math.PI);
+  ctx.stroke();
+  if (o.type === 'rest') {
+    ctx.fillStyle = P.acc; ctx.fillRect(-16, -63, 33, 5);
+    const w = Math.sin(ph * 1.3) * 3;
+    ctx.beginPath(); ctx.moveTo(-15, -62); ctx.quadraticCurveTo(-26, -66 + w, -33, -60 + w); ctx.lineTo(-30, -57 + w); ctx.quadraticCurveTo(-24, -61, -15, -58); ctx.fill();
+  } else {
+    ctx.fillStyle = P.dark;
+    ctx.beginPath(); ctx.ellipse(1, -67, 24, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-13, -69); ctx.quadraticCurveTo(-2, -88, 10, -104); ctx.quadraticCurveTo(12, -86, 15, -69); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = P.acc; ctx.fillRect(-12, -73, 27, 4);
+    ctx.save(); ctx.translate(10, -104); ctx.rotate(ph * .05); ctx.fillStyle = '#ffe066';
+    ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5, r = i % 2 ? 2.5 : 6; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); } ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  if (heavy) { const d = (ph * 3) % 20; ctx.fillStyle = '#6cc3ff'; ctx.beginPath(); ctx.ellipse(20, -64 + d * .6, 2.2, 3.4, 0, 0, Math.PI * 2); ctx.globalAlpha *= clamp(1 - d / 20, 0, 1); ctx.fill(); }
+  ctx.restore();
+}
+
+function drawClerk(ctx, cx, working, now, side) {
+  const y = 214;
+  ctx.fillStyle = '#4d7ea8'; rr(ctx, cx - 15, y + 10, 30, 16, 6); ctx.fill();
+  ctx.fillStyle = '#ffe3cc'; circle(ctx, cx, y, 12); ctx.fill();
+  ctx.fillStyle = '#6b4226'; ctx.beginPath(); ctx.arc(cx, y - 2, 13, Math.PI, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#2a2440'; circle(ctx, cx - 4, y + 1, 1.8); ctx.fill(); circle(ctx, cx + 4, y + 1, 1.8); ctx.fill();
+  if (working) {
+    for (let i = 0; i < 3; i++) { const a = now * .012 + i * 2.1; ctx.fillStyle = side === 'gql' ? '#ff7ac0' : '#ffb14a'; circle(ctx, cx + Math.cos(a) * 20, y - 20 + Math.sin(a) * 6, 3); ctx.fill(); }
+  }
+}
+
+class LaneView {
+  constructor(root, side) {
+    this.root = root; this.side = side; this.canvas = root.querySelector('canvas'); this.ctx = this.canvas.getContext('2d');
+    this.chipsEl = root.querySelector('.chips'); this.chips = {};
+    this.scene = { counters: ['/api'], cdn: false };
+    this.data = null; this.metricKind = 'trip';
+    const rnd = seeded(side === 'rest' ? 3 : 5);
+    this.stones = Array.from({ length: 46 }, () => ({ x: 60 + rnd() * 780, y: 244 + rnd() * 32, r: 2 + rnd() * 3 }));
+    this.flowers = Array.from({ length: 30 }, () => ({ x: rnd() * 1300, y: 290 + rnd() * 28, c: ['#ffffff', '#ffd3e2', '#fff3a3'][Math.floor(rnd() * 3)] }));
+    this.resize();
+    try { new ResizeObserver(() => this.resize()).observe(this.canvas); } catch (e) { window.addEventListener('resize', () => this.resize()); }
+  }
+  resize() {
+    // ฉากวาดลง buffer ความละเอียดต่ำ แล้วขยายขึ้นจอแบบไม่เกลี่ยสี = พิกเซลจริง
+    const r = this.canvas.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    const PX = Math.max(1, Math.round((CONFIG.PIXEL_SIZE || 1) * dpr));
+    const bw = Math.max(2, Math.round(r.width * dpr / PX)), bh = Math.max(2, Math.round(r.height * dpr / PX));
+    if (!this.buf) { this.buf = document.createElement('canvas'); this.bctx = this.buf.getContext('2d'); }
+    if (this.buf.width !== bw) this.buf.width = bw;
+    if (this.buf.height !== bh) this.buf.height = bh;
+    this.px = PX;
+    if (this.canvas.width !== bw * PX) this.canvas.width = bw * PX;
+    if (this.canvas.height !== bh * PX) this.canvas.height = bh * PX;
+    const k = Math.min(bw / GEO.W, bh / GEO.H); this.k = k; this.ox = (bw - GEO.W * k) / 2; this.oy = (bh - GEO.H * k) * .85;
+  }
+  setScene(sc) { this.scene = sc; }
+  setData(d) { this.data = d; }
+  setMetrics(kind) {
+    this.metricKind = kind; this.chipsEl.textContent = ''; this.chips = {};
+    const defs = kind === 'crowd'
+      ? [['avg', '⏱', 'เวลาเฉลี่ย'], ['done', '✅', 'เสร็จแล้ว'], ['guild', '🏰', 'คำขอถึงกิลด์'], ['queue', '👥', 'คิวหน้ากิลด์']]
+      : [['time', '⏱', 'เวลา'], ['req', '🏃', 'คำขอ'], ['kb', '📦', 'ข้อมูล'], ['db', '🗄', 'งานในคลัง']];
+    for (const [key, ic, lb] of defs) {
+      const c = h('span', 'chip'); c.append(h('i', null, ic), h('b', null, '-'), h('small', null, lb));
+      this.chipsEl.append(c); this.chips[key] = { b: c.querySelector('b'), v: '-' };
+    }
+  }
+  setChip(key, v) { const c = this.chips[key]; if (c && c.v !== v) { c.v = v; c.b.textContent = v; } }
+
+  updateMetrics(t) {
+    const d = this.data;
+    if (!d || t == null || t < 0) { for (const k in this.chips) this.setChip(k, '-'); return; }
+    if (d.items) {
+      let done = 0, sum = 0, hits = 0, q = 0;
+      for (const it of d.items) { if (it.d <= t) { done++; sum += it.d - it.s; } if (d.side === 'gql' && it.a <= t) hits++; if (it.a <= t && it.b > t) q++; }
+      this.setChip('avg', done ? fmtMs(sum / done) : '-');
+      this.setChip('done', done.toLocaleString() + ' / 1,000');
+      this.setChip('guild', hits.toLocaleString());
+      this.setChip('queue', q.toLocaleString());
+    } else {
+      let req = 0, kb = 0, db = 0;
+      for (const e of d.events) { if (e.t > t) break; if (e.k === 'req') req++; else if (e.k === 'kb') kb += e.v; else db++; }
+      this.setChip('time', fmtMs(Math.min(t, d.end)));
+      this.setChip('req', String(req));
+      this.setChip('kb', kb ? fmtKB(kb) : '0 KB');
+      this.setChip('db', db + ' ครั้ง');
+    }
+  }
+
+  draw(now, t) {
+    const ctx = this.bctx, k = this.k, BW = this.buf.width, BH = this.buf.height;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const hy = this.oy + 192 * k;
+    ctx.fillStyle = '#8fc9ee'; ctx.fillRect(0, 0, BW, hy);
+    ctx.fillStyle = '#6fa43c'; ctx.fillRect(0, hy, BW, BH - hy);
+    ctx.setTransform(k, 0, 0, k, this.ox, this.oy);
+    LBL = [];
+    let labels;
+    try { this.drawWorld(ctx, now, t); } finally { labels = LBL; LBL = null; }
+    const m = this.ctx, P = this.px;
+    m.setTransform(1, 0, 0, 1, 0, 0); m.globalAlpha = 1; m.imageSmoothingEnabled = false;
+    m.drawImage(this.buf, 0, 0, this.canvas.width, this.canvas.height);
+    for (const L of labels) { const q = L.m; m.setTransform(q.a * P, q.b * P, q.c * P, q.d * P, q.e * P, q.f * P); m.globalAlpha = L.a; L.fn(m); }
+    m.setTransform(1, 0, 0, 1, 0, 0); m.globalAlpha = 1;
+    this.updateMetrics(t);
+  }
+
+  drawWorld(ctx, now, t) {
+    const W = GEO.W, side = this.side, P = PAL[side], sc = this.scene, d = this.data;
+    // sky
+    ctx.fillStyle = '#8fc9ee'; ctx.fillRect(-400, -400, W + 800, 596);
+    ctx.fillStyle = '#b8e0f2'; ctx.fillRect(-2, 118, W + 4, 78);
+    ctx.fillStyle = '#fff1a8'; circle(ctx, 640, 58, 30); ctx.fill();
+    ctx.fillStyle = '#749b86';
+    ctx.beginPath(); ctx.moveTo(0, 192); [[0, 150], [110, 112], [230, 160], [380, 92], [540, 158], [690, 104], [860, 170], [1010, 96], [1180, 150], [1330, 110], [1480, 150], [1600, 120], [1600, 192]].forEach(p => ctx.lineTo(p[0], p[1])); ctx.fill();
+    ctx.fillStyle = '#eef3ff'; [[380, 92], [1010, 96], [690, 104]].forEach(([x, y]) => { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 22, y + 16); ctx.lineTo(x + 20, y + 15); ctx.fill(); });
+    for (let i = 0; i < 4; i++) {
+      const x = ((i * 430 + now * .012) % (W + 300)) - 150, y = 34 + (i % 2) * 34;
+      ctx.fillStyle = '#ffffff'; circle(ctx, x, y, 17); ctx.fill(); circle(ctx, x + 20, y - 8, 21); ctx.fill(); circle(ctx, x + 44, y, 16); ctx.fill(); rr(ctx, x - 12, y, 70, 14, 7); ctx.fill();
+    }
+    // ground
+    ctx.fillStyle = '#6fa43c'; ctx.fillRect(-2, 188, W + 4, 134);
+    ctx.fillStyle = '#8cc61b'; ctx.beginPath(); ctx.moveTo(0, 196); ctx.quadraticCurveTo(300, 178, 620, 196); ctx.quadraticCurveTo(900, 212, 1600, 192); ctx.lineTo(1600, 200); ctx.lineTo(0, 204); ctx.fill();
+    for (const f of this.flowers) { ctx.fillStyle = f.c; circle(ctx, f.x, f.y, 2.2); ctx.fill(); }
+    // road
+    ctx.fillStyle = '#dcc27a'; rr(ctx, 30, 236, 860, 46, 22); ctx.fill();
+    ctx.strokeStyle = '#997a32'; ctx.lineWidth = 4; ctx.stroke();
+    ctx.fillStyle = '#c4a55a'; for (const s of this.stones) { circle(ctx, s.x, s.y, s.r); ctx.fill(); }
+    // labels on ground
+    ctx.globalAlpha = .9;
+    pill(ctx, sc.cdn ? 600 : 520, 302, 'ถนน · Network  (ยิ่งไกล ยิ่งช้า)', { font: FONT(500, 17), bg: '#ffe4a1', stroke: '#853605', h: 26 });
+    ctx.globalAlpha = 1;
+    this.drawCamp(ctx, now);
+    if (sc.cdn) this.drawCdn(ctx, now);
+    this.drawWarehouse(ctx);
+    this.drawGuild(ctx, now, t);
+    if (d && d.items) this.drawCrowd(ctx, now, t);
+    else if (d) this.drawTrips(ctx, now, t);
+    else drawHero(ctx, GEO.campX, GEO.roadY, { type: side, facing: 1, phase: now * .018 });
+    // finish
+    const endT = d ? (d.items ? d.end : d.end) : null;
+    if (d && t != null && t >= endT) {
+      const val = d.items ? d.avg : d.end;
+      const age = clamp((t - endT) / (endT * .08 + 1), 0, 1);
+      ctx.save(); ctx.translate(GEO.campX + 30, 128); const s = .6 + .4 * easeIO(age); ctx.scale(s, s);
+      pill(ctx, 0, 0, (d.items ? 'เฉลี่ย ' : 'เสร็จ! ') + fmtMs(val), { font: FONT(600, 26), bg: P.main, color: '#fff', h: 44, padX: 18 });
+      ctx.restore();
+    }
+  }
+
+  drawCamp(ctx, now) {
+    const side = this.side;
+    ctx.fillStyle = '#f07f5e'; ctx.beginPath(); ctx.moveTo(34, 262); ctx.lineTo(146, 262); ctx.lineTo(90, 176); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#ffd9a8'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(90, 176); ctx.lineTo(62, 262); ctx.moveTo(90, 176); ctx.lineTo(118, 262); ctx.stroke();
+    ctx.fillStyle = '#5b3b25'; ctx.beginPath(); ctx.moveTo(90, 212); ctx.lineTo(78, 262); ctx.lineTo(102, 262); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#6f4a24'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(90, 178); ctx.lineTo(90, 150); ctx.stroke();
+    const wv = Math.sin(now * .006) * 3;
+    ctx.fillStyle = PAL[side].main; ctx.beginPath(); ctx.moveTo(90, 150); ctx.lineTo(116, 156 + wv); ctx.lineTo(90, 164); ctx.fill();
+    pill(ctx, 95, 302, 'หมู่บ้าน · Client', { font: FONT(600, 17), bg: '#ffe4a1', stroke: '#853605', h: 26 });
+  }
+
+  drawCdn(ctx, now) {
+    const x = GEO.cdnX, hit = this.side === 'rest';
+    ctx.fillStyle = '#8a5a34'; ctx.fillRect(x - 52, 178, 6, 60); ctx.fillRect(x + 46, 178, 6, 60);
+    for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#fff' : (hit ? '#2eb872' : '#9aa0ad'); ctx.beginPath(); ctx.moveTo(x - 58 + i * 19.3, 176); ctx.lineTo(x - 58 + (i + 1) * 19.3, 176); ctx.lineTo(x - 58 + (i + 1) * 19.3, 192); ctx.quadraticCurveTo(x - 58 + (i + .5) * 19.3, 200, x - 58 + i * 19.3, 192); ctx.fill(); }
+    ctx.fillStyle = '#c99257'; rr(ctx, x - 50, 216, 100, 20, 4); ctx.fill();
+    ctx.fillStyle = '#fff1c9'; for (let i = 0; i < 4; i++) { rr(ctx, x - 40 + i * 20, 206, 14, 11, 2); ctx.fill(); }
+    pill(ctx, x, 158, hit ? 'มีสำเนาแล้ว ✓' : 'จำไม่ได้ ✗', { font: FONT(600, 17), bg: hit ? '#2eb872' : '#8a8fa0', color: '#fff', h: 28 });
+    pill(ctx, x, 302, 'ร้านสาขา · CDN', { font: FONT(600, 17), bg: '#ffe4a1', stroke: '#853605', h: 26 });
+  }
+
+  drawWarehouse(ctx) {
+    ctx.save(); ctx.translate(-GSHIFT, 0);
+    ctx.fillStyle = '#8a4e2c'; ctx.beginPath(); ctx.moveTo(1432, 170); ctx.lineTo(1598, 170); ctx.lineTo(1515, 122); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#c98b52'; ctx.fillRect(1442, 168, 146, 96);
+    ctx.strokeStyle = '#a86d3a'; ctx.lineWidth = 2; for (let y = 180; y < 262; y += 14) { ctx.beginPath(); ctx.moveTo(1442, y); ctx.lineTo(1588, y); ctx.stroke(); }
+    ctx.fillStyle = '#5b3b25'; ctx.fillRect(1492, 206, 46, 58);
+    ctx.strokeStyle = '#c98b52'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(1492, 206); ctx.lineTo(1538, 264); ctx.moveTo(1538, 206); ctx.lineTo(1492, 264); ctx.stroke();
+    ctx.fillStyle = '#d9a066'; ctx.fillRect(1448, 240, 22, 22); ctx.fillRect(1560, 244, 20, 20);
+    ctx.strokeStyle = '#8a5a34'; ctx.strokeRect(1448, 240, 22, 22); ctx.strokeRect(1560, 244, 20, 20);
+    pill(ctx, 1515, 302, 'คลัง · Database', { font: FONT(600, 17), bg: '#ffe4a1', stroke: '#853605', h: 26 });
+    ctx.restore();
+  }
+
+  drawGuild(ctx, now, t) {
+    const side = this.side, P = PAL[side], sc = this.scene, d = this.data;
+    ctx.save(); ctx.translate(-GSHIFT, 0);
+    ctx.fillStyle = '#f3d9a4'; ctx.fillRect(1125, 120, 290, 144);
+    ctx.strokeStyle = '#b98b5a'; ctx.lineWidth = 4; ctx.strokeRect(1125, 120, 290, 144);
+    ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(1125, 160); ctx.lineTo(1415, 160); ctx.stroke();
+    ctx.fillStyle = '#3f4a7a'; ctx.beginPath(); ctx.moveTo(1104, 124); ctx.lineTo(1436, 124); ctx.lineTo(1398, 72); ctx.lineTo(1142, 72); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#2f3761'; ctx.fillRect(1104, 120, 332, 6);
+    ctx.strokeStyle = '#6f4a24'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(1160, 72); ctx.lineTo(1160, 34); ctx.moveTo(1380, 72); ctx.lineTo(1380, 34); ctx.stroke();
+    const wv = Math.sin(now * .005) * 3;
+    for (const fx of [1160, 1380]) { ctx.fillStyle = P.main; ctx.beginPath(); ctx.moveTo(fx, 34); ctx.lineTo(fx + 30, 41 + wv); ctx.lineTo(fx, 50); ctx.fill(); }
+    rr(ctx, 1200, 82, 140, 32, 8); ctx.fillStyle = '#6b3f1f'; ctx.fill();
+    deferText(ctx, c => { c.fillStyle = '#ffe7b0'; c.font = FONT(600, 20); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('กิลด์ · Server', 1270, 99); });
+    ctx.restore();
+    const labels = side === 'rest' ? sc.counters : [sc.gqlCounter || '/graphql'];
+    const xs = counterXs(labels.length);
+    const working = new Set();
+    if (d && !d.items && t != null) for (const w of d.works) if (t >= w.t0 && t < w.t1) working.add(w.cx);
+    labels.forEach((lb, i) => {
+      const cx = xs[i];
+      ctx.fillStyle = '#5b3b25'; rr(ctx, cx - 38, 180, 76, 60, 10); ctx.fill();
+      ctx.fillStyle = '#7a5334'; rr(ctx, cx - 32, 186, 64, 50, 8); ctx.fill();
+      drawClerk(ctx, cx, working.has(cx), now, side);
+      ctx.fillStyle = '#a8743f'; rr(ctx, cx - 45, 236, 90, 12, 3); ctx.fill();
+      pill(ctx, cx, 147, lb, { font: lb.length > 3 ? MONO(16) : FONT(600, 20), bg: '#ffe4a1', stroke: P.main, h: 26, padX: 10 });
+    });
+    if (d && d.items && side === 'gql' && t != null) {
+      const busy = d.items.some(it => it.b <= t && it.c > t);
+      drawClerk(ctx, xs[0], busy, now, side);
+    }
+  }
+
+  drawTrips(ctx, now, t) {
+    const d = this.data, side = this.side;
+    const tt = t == null ? -1 : t;
+    // DB orbs
+    for (const o of d.dots) {
+      const t1 = o.t0 + Math.max(o.t1 - o.t0, this.orbMin || 0);
+      if (tt < o.t0 || tt >= t1) continue;
+      const u = (tt - o.t0) / (t1 - o.t0), back = u >= .5, v = back ? (u - .5) * 2 : u * 2;
+      const p0 = { x: o.cx + (o.i - 4.5) * 3, y: 206 }, p2 = { x: GEO.dbX - 28 + (o.i % 10) * 6, y: 214 - (o.i % 3) * 8 }, p1 = { x: (o.cx + GEO.dbX) / 2 + (o.i % 10 - 5) * 6, y: 44 + (o.i % 10) * 11 };
+      const w = back ? 1 - v : v;
+      const x = (1 - w) * (1 - w) * p0.x + 2 * (1 - w) * w * p1.x + w * w * p2.x, y = (1 - w) * (1 - w) * p0.y + 2 * (1 - w) * w * p1.y + w * w * p2.y;
+      ctx.fillStyle = back ? 'rgba(80,220,150,.28)' : 'rgba(255,200,60,.28)'; circle(ctx, x, y, 9); ctx.fill();
+      ctx.fillStyle = back ? '#3fcf88' : '#ffc53d'; circle(ctx, x, y, 4.6); ctx.fill();
+    }
+    // จำนวนครั้งที่เข้าคลัง (ลอยเหนือคลัง)
+    let dbn = 0; for (const e of d.events) { if (e.t > tt) break; if (e.k === 'db') dbn++; }
+    if (dbn > 0) {
+      const hot = dbn >= 20, pulse = hot ? 1 + .06 * Math.sin(now * .02) : 1;
+      ctx.save(); ctx.translate(GEO.dbX, 96); ctx.scale(pulse, pulse);
+      pill(ctx, 0, 0, 'เข้าคลัง ×' + dbn, { font: FONT(600, hot ? 24 : 19), bg: hot ? '#d64545' : '#ffe4a1', color: hot ? '#fff' : '#3a1e17', stroke: hot ? '#a82f2f' : '#853605', h: hot ? 38 : 30 });
+      ctx.restore();
+    }
+    // runners grouped by actor
+    const actors = {};
+    for (const r of d.runners) (actors[r.actor] = actors[r.actor] || []).push(r);
+    const list = [];
+    for (const name in actors) {
+      const rs = actors[name];
+      let drawn = false;
+      for (const r of rs) {
+        const seg = r.segs.find(s => tt >= s.t0 && tt < s.t1);
+        if (!seg) continue;
+        const u = (tt - seg.t0) / Math.max(1e-6, seg.t1 - seg.t0);
+        const moving = seg.x0 !== seg.x1;
+        list.push({ x: lerp(seg.x0, seg.x1, u), y: GEO.roadY + r.yOff, type: r.type, facing: seg.x1 < seg.x0 ? -1 : 1, moving, carry: seg.carry, kb: seg.kb, scale: r.scale, phase: now * .018 + r.yOff });
+        drawn = true; break;
+      }
+      if (drawn) continue;
+      const first = Math.min(...rs.map(r => r.segs[0].t0)), last = Math.max(...rs.map(r => r.end));
+      if (name === 'hero') {
+        const done = tt >= d.end;
+        list.push({ x: GEO.campX, y: GEO.roadY, type: side, facing: 1, moving: false, phase: now * .018, hop: done ? Math.abs(Math.sin(now * .012)) * 9 : 0, carry: tt >= last && rs.length ? rs[rs.length - 1].segs[2].carry : 'none', kb: rs.length ? rs[rs.length - 1].segs[2].kb : 0 });
+      } else if (tt >= last) {
+        const a = 1 - clamp((tt - last) / (d.end * .06 + 1), 0, 1);
+        if (a > 0) list.push({ x: GEO.campX + 30, y: GEO.roadY + rs[0].yOff, type: side, facing: -1, moving: false, scale: rs[0].scale, alpha: a, phase: now * .018 });
+      }
+    }
+    list.sort((a, b) => a.y - b.y).forEach(o => drawHero(ctx, o.x, o.y, o));
+    // bubbles
+    for (const b of d.bubbles) {
+      if (tt < b.t0 || tt >= b.t1) continue;
+      const seg = b.runner.segs.find(s => tt >= s.t0 && tt < s.t1) || b.runner.segs[0];
+      const u = (tt - seg.t0) / Math.max(1e-6, seg.t1 - seg.t0), x = clamp(lerp(seg.x0, seg.x1, u), 200, 760), y = GEO.roadY + b.runner.yOff - 124;
+      deferText(ctx, c => {
+        c.font = MONO(17); const w = c.measureText(b.text).width + 22;
+        c.fillStyle = '#ffe4a1'; rr(c, x - w / 2, y - 17, w, 34, 10); c.fill();
+        c.strokeStyle = PAL[side].main; c.lineWidth = 3; c.stroke();
+        c.fillStyle = '#ffe4a1'; c.beginPath(); c.moveTo(x - 8, y + 16); c.lineTo(x, y + 28); c.lineTo(x + 8, y + 16); c.fill();
+        c.fillStyle = '#3a1e17'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(b.text, x, y + 1);
+      });
+    }
+  }
+
+  drawCrowd(ctx, now, t) {
+    const d = this.data, side = this.side, P = PAL[side];
+    const tt = t == null ? -1 : t;
+    drawHero(ctx, GEO.campX - 18, GEO.roadY - 2, { type: side, facing: 1, phase: now * .018, scale: .85 });
+    if (tt < 0) {
+      ctx.fillStyle = P.light; for (let i = 0; i < 120; i++) { circle(ctx, GEO.campX + 22 + (i % 12) * 7, 244 + Math.floor(i / 12) * 4, 2.6); ctx.fill(); }
+      return;
+    }
+    let lo = 0; while (lo < d.items.length && d.items[lo].b <= tt) lo++;
+    for (let i = 0; i < d.items.length; i++) {
+      const it = d.items[i];
+      if (tt < it.s || tt >= it.d + 40) continue;
+      let x, y, col = P.main, r = 3.2;
+      const lane = 244 + it.j * 34;
+      if (tt < it.a) { const u = (tt - it.s) / (it.a - it.s); x = lerp(GEO.campX + 20, it.tx, u); y = lane; }
+      else if (tt < it.b) { const rank = i - lo; x = it.tx - 16 - Math.floor(rank / 8) * 4.6 + (it.j - .5) * 5; y = 241 + (rank % 8) * 4.8 + (it.j * 7 % 1 - .5) * 3; col = i % 3 ? '#9b3d72' : '#c65b97'; r = 2.8; }
+      else if (tt < it.c) { x = it.tx; y = 252; col = '#ffc53d'; r = 4.5; }
+      else if (tt < it.d) { const u = (tt - it.c) / (it.d - it.c); x = lerp(it.tx, GEO.campX + 20, u); y = lane; col = '#2eb872'; }
+      else { ctx.globalAlpha = 1 - (tt - it.d) / 40; x = GEO.campX + 20 + it.j * 20; y = lane; col = '#2eb872'; }
+      ctx.fillStyle = col; circle(ctx, x, y, r); ctx.fill(); ctx.globalAlpha = 1;
+    }
+  }
+}
+/* =====================================================================
+   TRANSPORT: Supabase Realtime (ของจริง) หรือ BroadcastChannel (โหมดซ้อม)
+   host  : ฟัง channel "…-inbox"  /  ส่งสถานะเกมทาง "…-state"
+   player: ฟัง "…-state"          /  ส่งคำตอบเข้า "…-inbox" ผ่าน HTTP (ไม่ต้อง subscribe
+           เลยไม่มีใครได้ข้อความของคนอื่น ประหยัดโควตาข้อความ)
+   ===================================================================== */
+const HAS_SB = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
+class LocalTransport {
+  constructor(room, role) {
+    this.kind = 'local'; this.role = role; this.handlers = []; this.onStatus = () => { };
+    try { this.bc = new BroadcastChannel('guild-' + room); } catch (e) { this.bc = null; }
+    if (this.bc) this.bc.onmessage = ev => { const m = ev.data; if (!m) return; if ((role === 'host' && m.to === 'host') || (role === 'player' && m.to === 'players')) this.handlers.forEach(fn => fn(m.p)); };
+    setTimeout(() => this.onStatus('local'), 0);
+  }
+  on(fn) { this.handlers.push(fn); }
+  send(p) { if (this.bc) this.bc.postMessage({ to: this.role === 'host' ? 'players' : 'host', p }); }
+}
+class SbTransport {
+  constructor(room, role) {
+    this.kind = 'supabase'; this.role = role; this.handlers = []; this.onStatus = () => { }; this.stateReady = false;
+    const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false }, realtime: { params: { eventsPerSecond: 20 } } });
+    this.sb = sb;
+    const inName = `guild-${room}-inbox`, stName = `guild-${room}-state`;
+    const status = s => { this.onStatus(s === 'SUBSCRIBED' ? 'ok' : (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') ? 'err' : 'wait'); };
+    if (role === 'host') {
+      this.inbox = sb.channel(inName, { config: { broadcast: { self: false } } });
+      this.inbox.on('broadcast', { event: 'm' }, ({ payload }) => this.handlers.forEach(fn => fn(payload)));
+      this.inbox.subscribe(status);
+      this.state = sb.channel(stName, { config: { broadcast: { self: false } } });
+      this.state.subscribe(s => { this.stateReady = s === 'SUBSCRIBED'; });
+    } else {
+      this.state = sb.channel(stName, { config: { broadcast: { self: false } } });
+      this.state.on('broadcast', { event: 's' }, ({ payload }) => this.handlers.forEach(fn => fn(payload)));
+      this.state.subscribe(status);
+      this.inbox = sb.channel(inName);
+    }
+  }
+  on(fn) { this.handlers.push(fn); }
+  async send(p) {
+    try {
+      if (this.role === 'host') { if (this.stateReady) await this.state.send({ type: 'broadcast', event: 's', payload: p }); }
+      else if (typeof this.inbox.httpSend === 'function') await this.inbox.httpSend('m', p);
+      else await this.inbox.send({ type: 'broadcast', event: 'm', payload: p });
+    } catch (e) { console.warn('send failed', e); }
+  }
+}
+function makeTransport(room, role) {
+  if (HAS_SB && window.supabase && window.supabase.createClient) return new SbTransport(room, role);
+  return new LocalTransport(room, role);
+}
+function joinUrl(room) { return location.origin + location.pathname + '?room=' + encodeURIComponent(room); }
+function drawQR(el, text, size) {
+  el.textContent = '';
+  if (window.QRCode) { try { new QRCode(el, { text, width: size, height: size, colorDark: '#2a2440', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M }); return; } catch (e) { } }
+  el.append(h('div', 'joinurl', text));
+}
+
+/* =====================================================================
+   HOST
+   ===================================================================== */
+const BOT_NAMES = ['อัศวินนอนดึก', 'จอมเวทขี้เกียจ', 'นักธนูตาถั่ว', 'โจรใจดี', 'นักบวชสายปาร์ตี้', 'นักดาบหิวข้าว', 'พ่อค้าเร่', 'มังกรน้อย', 'ภูตแมวดำ', 'นักล่าบั๊ก', 'ช่างตีเหล็ก', 'นักเดินทางหลงทาง', 'ผู้กล้าเลเวล 1', 'แม่มดสายชาไข่มุก', 'คนเลี้ยงสไลม์', 'หมอผีฝึกหัด'];
+const BOT_BIAS = [{ gql: .6, rest: .25, tie: .15 }, { gql: .6, rest: .25, tie: .15 }, { gql: .55, rest: .3, tie: .15 }, { gql: .5, rest: .35, tie: .15 }, { gql: .45, rest: .25, tie: .3 }];
+
+const Host = {
+  st: null, steps: [], lanes: {}, tr: null, race: null, loop: null, timers: {}, resetArm: false,
+
+  init() {
+    document.body.className = 'host'; $('#host').classList.remove('hidden');
+    this.steps = [{ t: 'lobby' }, { t: 'legend' }];
+    CONFIG.PLAY_QUESTS.forEach(i => { this.steps.push({ t: 'quest', q: i }); this.steps.push({ t: 'race', q: i }); if (CONFIG.MINI_LEADERBOARD_AFTER.includes(i + 1)) this.steps.push({ t: 'mini', q: i }); });
+    this.steps.push({ t: 'takeaway' }, { t: 'podium' });
+    const saved = store.get('guild_host_v1', null);
+    this.st = saved && saved.room ? saved : { room: newRoomCode(), step: 0, players: {}, answers: {}, results: {}, openAt: {}, closedAt: {} };
+    this.st.step = clamp(this.st.step || 0, 0, this.steps.length - 1);
+    this.lanes.rest = new LaneView($('#laneRest'), 'rest');
+    this.lanes.gql = new LaneView($('#laneGql'), 'gql');
+    $('#roomCode').textContent = this.st.room;
+    drawQR($('#miniQr'), joinUrl(this.st.room), 120);
+    const prog = $('#progress'); CONFIG.PLAY_QUESTS.forEach(i => prog.append(h('i', null, String(i + 1))));
+    this.tr = makeTransport(this.st.room, 'host');
+    this.tr.onStatus = s => { const d = $('#connDot'); d.className = 'dot ' + (s === 'ok' ? 'ok' : s === 'local' ? 'local' : 'wait'); d.title = s; };
+    this.tr.on(m => this.onMsg(m));
+    setInterval(() => this.broadcast(), 2000);
+    $('#btnNext').onclick = () => this.next(); $('#btnPrev').onclick = () => this.prev();
+    window.addEventListener('keydown', e => this.onKey(e));
+    if (!HAS_SB) this.spawnBots(CONFIG.REHEARSAL_BOTS);
+    else { const nb = parseInt(new URLSearchParams(location.search).get('bots') || '0', 10); if (nb > 0) this.spawnBots(nb); }
+    requestAnimationFrame(now => this.frame(now));
+    this.enter(this.st.step, true);
+  },
+
+  save() { store.set('guild_host_v1', this.st); },
+  step() { return this.steps[this.st.step]; },
+  realPlayers() { return Object.entries(this.st.players).filter(([, p]) => !p.bot); },
+
+  onMsg(m) {
+    if (!m || typeof m !== 'object' || typeof m.pid !== 'string' || m.pid.length > 24) return;
+    const pid = m.pid;
+    if (m.k === 'join' || (m.k === 'ans' && !this.st.players[pid])) this.addPlayer(pid, m.name, false);
+    if (m.k === 'ans') this.takeAnswer(pid, m.q, m.c);
+  },
+  addPlayer(pid, name, bot) {
+    const P = this.st.players;
+    if (P[pid]) return;
+    let nm = cleanName(name) || 'นักผจญภัยนิรนาม';
+    const taken = new Set(Object.values(P).map(p => p.name));
+    if (taken.has(nm)) { let i = 2; while (taken.has(nm + ' ' + i)) i++; nm = nm + ' ' + i; }
+    P[pid] = { name: nm, bot: !!bot, at: Date.now() };
+    this.save(); this.renderCount();
+    if (this.step().t === 'lobby') this.renderLobbyNames();
+    this.broadcast();
+  },
+  answersOpen(qi) { const s = this.step(); return s.t === 'quest' && s.q === qi && !this.st.closedAt[qi] && this.st.openAt[qi] && Date.now() < this.st.openAt[qi] + CONFIG.PREDICT_SECONDS * 1000; },
+  takeAnswer(pid, qi, c) {
+    if (!Number.isInteger(qi) || !CHOICE[c] || !this.answersOpen(qi)) return;
+    const A = this.st.answers[qi] = this.st.answers[qi] || {};
+    if (A[pid]) return;
+    A[pid] = { c, ms: Date.now() - this.st.openAt[qi] };
+    this.save(); this.broadcast(); this.renderAnswerCount();
+  },
+  spawnBots(n) {
+    const existing = Object.values(this.st.players).filter(p => p.bot).length;
+    for (let i = existing; i < n; i++) setTimeout(() => this.addPlayer('bot' + i, BOT_NAMES[i % BOT_NAMES.length], true), 400 + i * 380);
+  },
+  botsAnswer(qi) {
+    const bias = BOT_BIAS[qi] || { gql: .4, rest: .3, tie: .3 };
+    for (const [pid, p] of Object.entries(this.st.players)) {
+      if (!p.bot) continue;
+      const delay = 1500 + Math.random() * (CONFIG.PREDICT_SECONDS * 1000 * .7);
+      setTimeout(() => { const r = Math.random(); const c = r < bias.gql ? 'gql' : r < bias.gql + bias.rest ? 'rest' : 'tie'; this.takeAnswer(pid, qi, c); }, delay);
+    }
+  },
+
+  totals() { const T = {}; for (const pid in this.st.players) T[pid] = 0; for (const qi in this.st.results) for (const pid in this.st.results[qi]) T[pid] = (T[pid] || 0) + this.st.results[qi][pid].g; return T; },
+  ranking() { const T = this.totals(); return Object.keys(this.st.players).sort((a, b) => (T[b] - T[a]) || this.st.players[a].name.localeCompare(this.st.players[b].name, 'th')).map((pid, i) => ({ pid, name: this.st.players[pid].name, score: T[pid] || 0, rank: i + 1 })); },
+  score(qi) {
+    if (this.st.results[qi]) return;
+    const q = QUESTS[qi], A = this.st.answers[qi] || {}, R = {}, dur = CONFIG.PREDICT_SECONDS * 1000;
+    for (const pid in A) { const ok = A[pid].c === q.answer; R[pid] = { g: ok ? Math.round(500 + 500 * clamp(1 - A[pid].ms / dur, 0, 1)) : 0, ok }; }
+    this.st.results[qi] = R; this.save();
+  },
+
+  publicState() {
+    const s = this.step(), p = { v: 1, room: this.st.room, s: this.st.step, t: s.t, q: s.q == null ? null : s.q, n: Object.keys(this.st.players).length, ids: this.realPlayers().map(([pid]) => pid) };
+    if (s.t === 'quest') {
+      const q = QUESTS[s.q]; p.title = q.title; p.need = q.need; p.open = this.answersOpen(s.q);
+      p.left = p.open ? Math.max(0, this.st.openAt[s.q] + CONFIG.PREDICT_SECONDS * 1000 - Date.now()) : 0;
+      p.ans = Object.keys(this.st.answers[s.q] || {}).filter(pid => !this.st.players[pid] || !this.st.players[pid].bot);
+    }
+    const withRes = (s.t === 'race' && this.st.results[s.q]) || ['mini', 'takeaway', 'podium'].includes(s.t);
+    if (s.t === 'race') { p.title = QUESTS[s.q].title; p.done = !!this.st.results[s.q]; if (p.done) p.correct = QUESTS[s.q].answer; }
+    if (withRes) {
+      const rk = this.ranking(), R = s.t === 'race' ? this.st.results[s.q] : null; p.res = {};
+      for (const r of rk) { if (this.st.players[r.pid].bot) continue; const x = R && R[r.pid]; p.res[r.pid] = [r.score, x ? x.g : 0, x ? (x.ok ? 1 : 0) : -1, r.rank]; }
+      p.total = rk.length;
+      if (s.t === 'podium') p.top = rk.slice(0, 3).map(r => [r.name, r.score]);
+    }
+    return p;
+  },
+  broadcast() { if (this.tr) this.tr.send(this.publicState()); },
+
+  onKey(e) {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    const k = e.key;
+    if (k === 'ArrowRight' || k === ' ' || k === 'PageDown' || k === 'Enter') { e.preventDefault(); this.next(); }
+    else if (k === 'ArrowLeft' || k === 'PageUp') { e.preventDefault(); this.prev(); }
+    else if (k === 'r' || k === 'R') this.replay();
+    else if (k === 'd' || k === 'D') this.dataloader();
+    else if (k === 'q' || k === 'Q') this.toggleBigQR();
+    else if (k === 'f' || k === 'F') { if (!document.fullscreenElement) document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => { }); else document.exitFullscreen && document.exitFullscreen(); }
+  },
+  next() {
+    const s = this.step();
+    if (s.t === 'quest' && this.answersOpen(s.q)) { this.st.closedAt[s.q] = Date.now(); this.save(); this.renderPanel(); this.broadcast(); return; }
+    if (s.t === 'race' && this.race && !this.race.fired) { this.skipRace(); return; }
+    if (this.st.step < this.steps.length - 1) this.enter(this.st.step + 1);
+  },
+  prev() { if (this.st.step > 0) this.enter(this.st.step - 1); },
+  enter(i, restoring) {
+    this.st.step = i; this.save();
+    const s = this.step();
+    $('#ovLobby').classList.toggle('hidden', s.t !== 'lobby');
+    $('#ovBoard').classList.toggle('hidden', !['mini', 'takeaway', 'podium'].includes(s.t));
+    $('#confetti').classList.add('hidden'); this.confetti = null;
+    document.querySelectorAll('.crown').forEach(e => e.remove());
+    const pr = $('#progress').children; const cq = s.q == null ? (s.t === 'takeaway' || s.t === 'podium' ? 99 : -1) : s.q;
+    for (let j = 0; j < pr.length; j++) { const qj = CONFIG.PLAY_QUESTS[j]; pr[j].className = qj === cq ? 'on' : (qj < cq ? 'done' : ''); }
+    this.race = null; this.loop = null;
+    if (s.t === 'lobby') this.renderLobby();
+    if (s.t === 'legend') this.startLegend();
+    if (s.t === 'quest') {
+      const q = QUESTS[s.q];
+      if (!this.st.openAt[s.q] && !this.st.results[s.q]) { this.st.openAt[s.q] = Date.now(); this.save(); this.botsAnswer(s.q); }
+      this.setupLanes(s.q, null, false);
+    }
+    if (s.t === 'race') { if (!this.st.closedAt[s.q]) { this.st.closedAt[s.q] = Date.now(); this.save(); } this.startRace(s.q, null); }
+    if (s.t === 'mini') this.renderMini(s.q);
+    if (s.t === 'takeaway') this.renderTakeaway();
+    if (s.t === 'podium') this.renderPodium();
+    this.renderPanel(); this.renderCount(); this.broadcast();
+  },
+
+  setupLanes(qi, variant, withData) {
+    const q = QUESTS[qi], built = q.build(variant);
+    for (const side of ['rest', 'gql']) {
+      const L = this.lanes[side];
+      L.setScene({ counters: q.counters, gqlCounter: q.gqlCounter, cdn: !!q.crowd });
+      L.setMetrics(q.crowd ? 'crowd' : 'trip');
+      L.setData(withData ? built[side] : (q.crowd ? { items: [], end: 1, avg: 0, side, idle: true } : null));
+    }
+    return built;
+  },
+  startRace(qi, variant, keepScale) {
+    const built = this.setupLanes(qi, variant, true);
+    const maxEnd = Math.max(built.rest.end, built.gql.end);
+    const scale = keepScale || CONFIG.RACE_TARGET_MS / maxEnd;
+    this.race = { qi, variant, built, maxEnd, scale, start: performance.now() + 700, fired: false, result: sideResult(built) };
+    this.lanes.rest.orbMin = this.lanes.gql.orbMin = 520 / scale;
+    document.querySelectorAll('.crown').forEach(e => e.remove());
+    this.renderPanel();
+  },
+  skipRace() { if (this.race) this.race.start = performance.now() - this.race.maxEnd * 1.05 * this.race.scale; },
+  replay() { const s = this.step(); if (s.t === 'race' && this.race && this.race.fired) this.startRace(s.q, this.race.variant, this.race.scale); },
+  dataloader() { const s = this.step(); if (s.t === 'race' && s.q === 2 && this.race && this.race.fired) this.startRace(2, this.race.variant === 'dataloader' ? null : 'dataloader', this.race.scale); },
+  onRaceDone() {
+    const r = this.race; r.fired = true;
+    if (!r.variant) { this.score(r.qi); this.broadcast(); }
+    const w = r.result.winner;
+    const mk = (side, txt) => { const c = h('div', 'crown', txt); this.lanes[side].root.append(c); };
+    if (w === 'tie') { mk('rest', '🤝 เสมอ'); mk('gql', '🤝 เสมอ'); } else mk(w, '👑 ชนะ!');
+    this.renderPanel();
+  },
+  startLegend() {
+    const q = { counters: ['①', '②', '③'], gqlCounter: '/graphql' };
+    const rest = newTL(), gql = newTL();
+    addTrip(rest, { type: 'rest', net: NET.g4, t0: 0, cx: counterXs(3)[0], db: [{ n: 1, qt: 6 }], pre: 2, post: 4, kb: 6, retCarry: 'sack', bubble: 'GET /adventurers/7' });
+    addTrip(gql, { type: 'gql', net: NET.g4, t0: 0, cx: counterXs(1)[0], db: [{ n: 1, qt: 6 }], pre: 3, post: 2, kb: 1.5, outCarry: 'scroll', retCarry: 'pouch', bubble: 'POST /graphql' });
+    const built = { rest: finalize(rest), gql: finalize(gql) };
+    for (const side of ['rest', 'gql']) { const L = this.lanes[side]; L.setScene({ counters: q.counters, gqlCounter: q.gqlCounter, cdn: false }); L.setMetrics('trip'); L.setData(built[side]); }
+    const maxEnd = Math.max(built.rest.end, built.gql.end);
+    this.loop = { built, maxEnd, scale: 4200 / maxEnd, start: performance.now() + 400 };
+    this.lanes.rest.orbMin = this.lanes.gql.orbMin = 520 / this.loop.scale;
+  },
+
+  frame(now) {
+    requestAnimationFrame(n => this.frame(n));
+    let t = null;
+    if (this.race) {
+      t = (now - this.race.start) / this.race.scale;
+      if (!this.race.fired && t >= this.race.maxEnd * 1.04) this.onRaceDone();
+    } else if (this.loop) {
+      t = (now - this.loop.start) / this.loop.scale;
+      if (t > this.loop.maxEnd * 1.6) this.loop.start = now + 300;
+    }
+    const s = this.step();
+    if (s.t === 'lobby' || s.t === 'mini' || s.t === 'takeaway' || s.t === 'podium') { if (this.confetti) this.drawConfetti(now); return; }
+    this.lanes.rest.draw(now, t); this.lanes.gql.draw(now, t);
+    if (s.t === 'quest') this.tickTimer();
+  },
+
+  /* ---------- panel ---------- */
+  renderPanel() {
+    const P = $('#panel'), s = this.step(); P.textContent = '';
+    if (s.t === 'legend') {
+      P.append(h('div', 'kicker', 'ก่อนเริ่มภารกิจ'), h('h2', null, 'แผนที่กิลด์: อ่านฉากยังไง'));
+      const L = h('div', 'legend-list');
+      [['🏕', 'หมู่บ้าน = Client', 'แอปมือถือ หรือเว็บ ที่อยากได้ข้อมูล'], ['🛣', 'ถนน = Network', 'ทุกการไป-กลับเสียเวลา ยิ่งเน็ตช้า ถนนยิ่งยาว'], ['🏰', 'กิลด์ = Server (API)', 'ที่รับคำขอแล้วเตรียมข้อมูลให้'], ['🪟', 'เคาน์เตอร์ ① ② ③ = Endpoint', 'แต่ละช่องมี URL ของตัวเอง เช่น /adventurers'], ['📦', 'คลังหลังกิลด์ = Database', 'ลูกไฟสีเหลือง คือการวิ่งเข้าคลัง 1 ครั้ง (1 query)'], ['🏃', 'ปาร์ตี้ REST', 'วิ่งไปตามเคาน์เตอร์ที่ต้องการ รับของเป็นชุดที่กิลด์จัดไว้แล้ว'], ['🧙', 'ปาร์ตี้ GraphQL', 'เขียนใบคำขอ (query) ใบเดียว ยื่นที่ /graphql เสมียนไปหยิบให้ตามรายการ']]
+        .forEach(([ic, b, tx]) => { const d = h('div'); const r = h('span'); r.append(h('b', null, b), document.createElement('br'), document.createTextNode(tx)); d.append(h('span', 'ic', ic), r); L.append(d); });
+      P.append(L, h('div', 'hint', 'ในแต่ละภารกิจ ทายบนมือถือว่าใครจะเสร็จก่อน ทายถูกและตอบไวได้คะแนนเยอะ'), h('div', 'hint', '* ตัวเลขในเกมมาจากโมเดลจำลองง่ายๆ (เวลาเดินทาง, ขนาดข้อมูล, เวลา query) เพื่อให้เห็นภาพ ไม่ใช่ benchmark จริง'));
+      return;
+    }
+    if (s.t !== 'quest' && s.t !== 'race') return;
+    const q = QUESTS[s.q], raced = s.t === 'race' && this.race && this.race.fired;
+    P.append(h('div', 'kicker', `ภารกิจ ${s.q + 1}`), h('h2', null, q.title.replace(/^ภารกิจ(สุดท้าย| \d):\s*/, '')));
+    if (!raced) P.append(h('div', 'need', '📜 ' + q.need), h('div', 'netchip', q.net.label));
+    if (!raced) {
+      const C = h('div', 'codes');
+      const box = (cls, cap, code, note) => { const b = h('div', 'codebox ' + cls); b.append(h('div', 'cap', cap), h('pre', null, code)); if (note) b.append(h('div', 'note', note)); return b; };
+      C.append(box('rest', '🏃 ฝั่ง REST', q.restCode), box('gql', '🧙 ฝั่ง GraphQL', q.gqlCode, q.gqlNote));
+      P.append(C);
+    }
+    if (s.t === 'quest') {
+      const T = h('div', 'timer'); T.id = 'timerBox';
+      const ring = h('div', 'ring'); ring.append(h('span', null, '')); T.append(ring);
+      const tx = h('div', 'txt'); T.append(tx); P.append(T);
+      this.tickTimer(true);
+      return;
+    }
+    if (!raced) { P.append(h('div', 'hint', this.race && this.race.variant === 'dataloader' ? '🔧 แข่งใหม่หลังใส่ DataLoader...' : '⚔️ กำลังแข่ง... (กด → เพื่อข้ามไปตอนจบ)')); return; }
+    const r = this.race.result, w = r.winner;
+    const V = h('div', 'verdict ' + w);
+    const vt = h('div'); vt.append(document.createTextNode(w === 'tie' ? '🤝 เสมอ!' : (w === 'rest' ? '🏃 REST ชนะ!' : '🧙 GraphQL ชนะ!')));
+    const unit = r.crowd ? 'เวลาเฉลี่ย' : 'เวลารวม';
+    vt.append(h('small', null, `${unit}  REST ${fmtMs(r.rest)}  ·  GraphQL ${fmtMs(r.gql)}`)); V.append(vt); P.append(V);
+    if (!this.race.variant) {
+      const A = this.st.answers[s.q] || {}, cnt = { rest: 0, gql: 0, tie: 0 }; for (const pid in A) cnt[A[pid].c]++;
+      const tot = Math.max(1, cnt.rest + cnt.gql + cnt.tie), D = h('div', 'dist');
+      for (const c of ['rest', 'gql', 'tie']) {
+        const row = h('div', 'row' + (c === q.answer ? ' correct' : '')), bar = h('div', 'bar'), fill = h('i');
+        fill.style.background = `var(--${c})`; bar.append(fill); row.append(h('span', null, CHOICE[c].icon + ' ' + CHOICE[c].label), bar, h('span', null, String(cnt[c]))); D.append(row);
+        requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = (cnt[c] / tot * 100) + '%'; }));
+      }
+      P.append(h('div', 'hint', 'คนในห้องทายว่า'), D);
+    } else {
+      const tt = tlTotals(this.race.built.gql);
+      P.append(h('div', 'extra', `🔧 ใส่ DataLoader แล้ว: เข้าคลังเหลือ ${tt.db} ครั้ง (จาก 301) กลับมาสูสีกับ REST`));
+    }
+    const L = h('div', 'lesson'); L.append(h('h3', null, q.lessonTitle), h('p', null, q.lesson)); P.append(L);
+    if (q.extra && !(this.race.variant)) P.append(h('div', 'extra', q.extra));
+  },
+  tickTimer(force) {
+    const s = this.step(); if (s.t !== 'quest') return;
+    const box = $('#timerBox'); if (!box) return;
+    const open = this.answersOpen(s.q), openAt = this.st.openAt[s.q];
+    const left = open ? Math.max(0, openAt + CONFIG.PREDICT_SECONDS * 1000 - Date.now()) : 0;
+    const sec = Math.ceil(left / 1000);
+    if (!force && this._lastSec === sec + ':' + open) { this.renderAnswerCount(); return; }
+    this._lastSec = sec + ':' + open;
+    const ring = box.querySelector('.ring'); ring.style.setProperty('--p', open ? left / (CONFIG.PREDICT_SECONDS * 1000) : 0); ring.querySelector('span').textContent = open ? String(sec) : '⏸';
+    const tx = box.querySelector('.txt'); tx.textContent = '';
+    if (this.st.results[s.q]) tx.append(h('b', null, 'แข่งไปแล้ว'), document.createElement('br'), document.createTextNode('กด → เพื่อดูการแข่งอีกครั้ง'));
+    else if (open) tx.append(h('b', null, 'ทายบนมือถือเลย!'), document.createElement('br'), document.createTextNode('ใครจะทำภารกิจเสร็จก่อน? '), h('span', 'ansCount'));
+    else tx.append(h('b', null, 'หมดเวลาทาย'), document.createElement('br'), document.createTextNode('กด → เพื่อเริ่มแข่ง '), h('span', 'ansCount'));
+    if (open && left <= 0) { this.broadcast(); }
+    this.renderAnswerCount();
+  },
+  renderAnswerCount() {
+    const el = document.querySelector('.ansCount'); const s = this.step(); if (!el || s.t !== 'quest') return;
+    const n = Object.keys(this.st.answers[s.q] || {}).length, tot = Object.keys(this.st.players).length;
+    const v = `(ทายแล้ว ${n}/${tot})`; if (el.textContent !== v) el.textContent = v;
+  },
+  renderCount() { $('#peopleCount').textContent = String(Object.keys(this.st.players).length); const c = document.querySelector('#ovLobby .count'); if (c) c.textContent = `นักผจญภัยในกิลด์: ${Object.keys(this.st.players).length} คน`; },
+
+  /* ---------- overlays ---------- */
+  renderLobby() {
+    const O = $('#ovLobby'); O.textContent = '';
+    const wrap = h('div', 'lobby'), L = h('div', 'left'), R = h('div', 'right');
+    L.append(h('div', 'sub', 'สแกนเพื่อเข้าร่วมกิลด์ ⚔️'));
+    const qr = h('div', 'qr-big'); L.append(qr);
+    L.append(h('div', 'bigcode', this.st.room), h('div', 'joinurl', joinUrl(this.st.room)));
+    R.append(h('h1', null, 'กิลด์นักผจญภัย\nREST vs GraphQL'));
+    R.firstChild.style.whiteSpace = 'pre-line';
+    R.append(h('div', 'sub', 'ตั้งชื่อนักผจญภัยของคุณ แล้วทายผลแต่ละภารกิจ ทายถูก + ตอบไว = คะแนนเยอะ'));
+    if (!HAS_SB) R.append(h('div', 'warn', `โหมดซ้อม: ยังไม่ได้ใส่ Supabase ในไฟล์ เพื่อนในห้องจะเข้าไม่ได้ (ตอนนี้เล่นกับบอท ${CONFIG.REHEARSAL_BOTS} ตัว และแท็บอื่นในเบราว์เซอร์นี้)`));
+    if (location.protocol === 'file:') R.append(h('div', 'warn', 'เปิดจากไฟล์ในเครื่องอยู่ มือถือจะเปิดลิงก์นี้ไม่ได้ ต้องอัปขึ้น GitHub Pages ก่อน'));
+    R.append(h('div', 'count', ''));
+    const cloud = h('div', 'namecloud'); cloud.id = 'nameCloud'; R.append(cloud);
+    const foot = h('div', 'foot');
+    const go = h('button', 'btn', 'เริ่มเลย →'); go.onclick = () => this.next();
+    const reset = h('button', 'btn ghost', 'ล้างเกม / เริ่มห้องใหม่');
+    reset.onclick = () => { if (!this.resetArm) { this.resetArm = true; reset.textContent = 'กดอีกครั้งเพื่อยืนยัน'; setTimeout(() => { this.resetArm = false; reset.textContent = 'ล้างเกม / เริ่มห้องใหม่'; }, 3000); return; } store.del('guild_host_v1'); location.reload(); };
+    foot.append(go, reset); R.append(foot);
+    wrap.append(L, R); O.append(wrap);
+    requestAnimationFrame(() => { const sz = Math.round(qr.getBoundingClientRect().width - 20); drawQR(qr, joinUrl(this.st.room), Math.max(160, sz)); });
+    this.renderLobbyNames(); this.renderCount();
+  },
+  renderLobbyNames() {
+    const cloud = $('#nameCloud'); if (!cloud) return;
+    const have = new Set([...cloud.children].map(c => c.dataset.pid));
+    for (const [pid, p] of Object.entries(this.st.players)) { if (have.has(pid)) continue; const sp = h('span', p.bot ? 'bot' : '', p.name); sp.dataset.pid = pid; cloud.append(sp); }
+    this.renderCount();
+  },
+  toggleBigQR() {
+    const O = $('#ovBoard'); const s = this.step();
+    if (!O.classList.contains('hidden') && O.dataset.qr) { O.classList.add('hidden'); delete O.dataset.qr; if (['mini', 'takeaway', 'podium'].includes(s.t)) this.enter(this.st.step); return; }
+    O.textContent = ''; O.dataset.qr = '1'; O.classList.remove('hidden');
+    const b = h('div', 'lobby'); b.style.gridTemplateColumns = '1fr'; const L = h('div', 'left'); const qr = h('div', 'qr-big');
+    L.append(h('div', 'sub', 'ยังไม่ได้เข้า? สแกนเลย (กด Q เพื่อปิด)'), qr, h('div', 'bigcode', this.st.room)); b.append(L); O.append(b);
+    requestAnimationFrame(() => drawQR(qr, joinUrl(this.st.room), Math.max(160, Math.round(qr.getBoundingClientRect().width - 20))));
+  },
+  renderMini(qi) {
+    const O = $('#ovBoard'); O.textContent = ''; delete O.dataset.qr;
+    const B = h('div', 'board'); B.append(h('h1', null, `🏆 อันดับหลังภารกิจ ${qi + 1}`));
+    const R = this.st.results[qi] || {};
+    this.ranking().slice(0, 5).forEach((r, i) => {
+      const row = h('div', 'lb-row'); row.style.animationDelay = (i * .08) + 's';
+      const nm = h('span', null, r.name); const g = R[r.pid] && R[r.pid].g; if (g) nm.append(h('span', 'up', '+' + g));
+      row.append(h('span', 'rk', ['🥇', '🥈', '🥉', '4', '5'][i]), nm, h('span', 'sc', r.score.toLocaleString())); B.append(row);
+    });
+    if (!Object.keys(this.st.players).length) B.append(h('div', 'hint', 'ยังไม่มีใครเข้าร่วม'));
+    O.append(B);
+  },
+  renderTakeaway() {
+    const O = $('#ovBoard'); O.textContent = ''; delete O.dataset.qr;
+    const T = h('div', 'take');
+    T.append(h('h1', null, 'คำถามจริงไม่ใช่ REST หรือ GraphQL'));
+    const sub = h('div', 'sub'); sub.append(document.createTextNode('แต่คือ '), h('mark', null, 'ใครเป็นคนกำหนดหน้าตาข้อมูล'), document.createTextNode(' และ '), h('mark', null, 'ความซับซ้อนไปกองอยู่ตรงไหน'));
+    T.append(sub);
+    const G = h('div', 'sumgrid');
+    const one = ['GraphQL ขอเฉพาะ field ที่ใช้', 'GraphQL รวบหลายคำขอเป็นรอบเดียว', 'resolver ทีละ field ทำคลังพัง (N+1)', 'URL เดียวกัน = cache ได้ฟรี', 'ออกแบบดี ทั้งคู่ไปถึงจุดเดียวกัน'];
+    QUESTS.forEach((q, i) => {
+      const c = h('div', 'sum'); c.style.animationDelay = (i * .1) + 's';
+      c.append(h('div', 'qn', 'ภารกิจ ' + (i + 1)), h('div', 'qt', q.name), h('span', 'wn ' + q.answer, q.answer === 'tie' ? '🤝 เสมอ' : (q.answer === 'rest' ? '🏃 REST' : '🧙 GraphQL')), h('div', 'ls', one[i]));
+      G.append(c);
+    });
+    T.append(G);
+    T.append(h('div', 'sub2', 'ทีมมีคนดูแลหลังร้าน (resolver, cache, security) และมี client หลายแบบ: GraphQL คุ้ม  ·  ทีมเล็ก ข้อมูลซ้ำเยอะ อยากได้ cache ฟรี: REST ที่ออกแบบดีก็พอ'));
+    O.append(T);
+  },
+  renderPodium() {
+    const O = $('#ovBoard'); O.textContent = ''; delete O.dataset.qr;
+    const B = h('div', 'board'); B.style.width = 'min(80vw,1200px)'; B.append(h('h1', null, '🏆 ทำเนียบผู้กล้าประจำคาบ'));
+    const rk = this.ranking(), pod = h('div', 'podium');
+    [[1, 'p2'], [0, 'p1'], [2, 'p3']].forEach(([i, cls]) => { const r = rk[i]; if (!r) return; const p = h('div', 'pod ' + cls); p.append(h('div', 'nm', r.name), h('div', 'ps', r.score.toLocaleString() + ' คะแนน')); const blk = h('div', 'blk', String(i + 1)); blk.style.animationDelay = (i === 0 ? .6 : i === 1 ? .3 : 0) + 's'; p.append(blk); pod.append(p); });
+    B.append(pod);
+    const rest = h('div', 'rest-list'); rk.slice(3, 11).forEach(r => { const d = h('div'); d.append(h('span', null, r.rank + '. ' + r.name), h('b', null, r.score.toLocaleString())); rest.append(d); });
+    const wrap = h('div'); wrap.style.display = 'flex'; wrap.style.justifyContent = 'center'; wrap.append(rest); B.append(wrap);
+    O.append(B); this.startConfetti();
+  },
+  startConfetti() {
+    const c = $('#confetti'); c.classList.remove('hidden'); c.width = innerWidth; c.height = innerHeight;
+    const cols = ['#e8553e', '#cf2f86', '#f2b631', '#2eb872', '#4d7ea8'];
+    this.confetti = { c, parts: Array.from({ length: 160 }, () => ({ x: Math.random() * innerWidth, y: -Math.random() * innerHeight, vy: 1.5 + Math.random() * 3, vx: -1 + Math.random() * 2, r: Math.random() * 6, a: Math.random() * 6, col: cols[Math.floor(Math.random() * cols.length)] })), until: performance.now() + 9000 };
+  },
+  drawConfetti(now) {
+    const C = this.confetti, ctx = C.c.getContext('2d'); ctx.clearRect(0, 0, C.c.width, C.c.height);
+    if (now > C.until) { C.c.classList.add('hidden'); this.confetti = null; return; }
+    for (const p of C.parts) { p.y += p.vy; p.x += p.vx; p.a += .08; if (p.y > C.c.height + 20) { p.y = -20; p.x = Math.random() * C.c.width; } ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.fillStyle = p.col; ctx.fillRect(-4, -7, 8, 14); ctx.restore(); }
+  },
+};
+/* =====================================================================
+   PLAYER (มือถือ)
+   ===================================================================== */
+const Player = {
+  room: '', pid: '', name: '', tr: null, state: null, myAns: {}, conn: 'wait', started: 0, lastJoin: 0, lastAns: 0, deadline: 0, deadlineQ: null, viewKey: '',
+  init(room) {
+    document.body.className = 'player'; $('#player').classList.remove('hidden');
+    this.room = room; $('#pRoom').textContent = room; this.started = Date.now();
+    this.pid = store.get('guild_pid', null) || randId(10); store.set('guild_pid', this.pid);
+    const saved = store.get('guild_player_' + room, null) || {};
+    this.name = saved.name || ''; this.myAns = saved.ans || {};
+    this.tr = makeTransport(room, 'player');
+    this.tr.onStatus = s => { this.conn = s; this.render(); };
+    this.tr.on(p => this.onState(p));
+    setInterval(() => this.tick(), 1000);
+    this.render();
+    if (this.name) this.send({ k: 'join' });
+  },
+  save() { store.set('guild_player_' + this.room, { name: this.name, ans: this.myAns }); },
+  send(m) { this.tr.send(Object.assign({ pid: this.pid, name: this.name }, m)); },
+  onState(p) {
+    if (!p || typeof p !== 'object' || p.room !== this.room) return;
+    this.state = p;
+    if (p.t === 'quest' && p.open) { const dl = Date.now() + (p.left || 0); if (this.deadlineQ !== p.q || Math.abs(dl - this.deadline) > 1500) { this.deadline = dl; this.deadlineQ = p.q; } }
+    this.render();
+  },
+  joined() { return !!(this.state && Array.isArray(this.state.ids) && this.state.ids.includes(this.pid)); },
+  canAnswer() { const s = this.state; return s && s.t === 'quest' && s.open && Date.now() < this.deadline && this.myAns[s.q] == null; },
+  tick() {
+    const now = Date.now(), s = this.state;
+    if (this.name && !this.joined() && now - this.lastJoin > 3000) { this.lastJoin = now; this.send({ k: 'join' }); }
+    if (s && s.t === 'quest' && s.open) { const a = this.myAns[s.q]; if (a && !(s.ans || []).includes(this.pid) && now - this.lastAns > 2500) { this.lastAns = now; this.send({ k: 'ans', q: s.q, c: a }); } }
+    this.render();
+  },
+  answer(c) {
+    const s = this.state; if (!this.canAnswer()) return;
+    this.myAns[s.q] = c; this.save(); this.lastAns = Date.now();
+    this.send({ k: 'ans', q: s.q, c });
+    if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) { }
+    this.viewKey = ''; this.render();
+  },
+  render() {
+    const s = this.state, M = $('#pMain');
+    $('#pMe').textContent = this.name ? '🧝 ' + this.name : 'ยังไม่ได้ตั้งชื่อ';
+    $('#pFoot').textContent = this.tr && this.tr.kind === 'local' ? 'โหมดซ้อม (ยังไม่ได้ต่อ Supabase)' : (this.conn === 'ok' ? '🟢 เชื่อมต่อแล้ว' : '🟡 กำลังเชื่อมต่อ…');
+    if (!this.name) { if (this.viewKey !== 'name') { this.viewKey = 'name'; this.renderName(M); } return; }
+    if (!s) {
+      const late = Date.now() - this.started > 8000;
+      const key = 'wait:' + late; if (this.viewKey === key) return; this.viewKey = key;
+      M.textContent = ''; const c = h('div', 'p-card'); c.append(h('div', 'p-big', '🏰'), h('h2', null, 'กำลังเข้ากิลด์…'));
+      if (late) c.append(h('p', null, 'ยังหาห้องไม่เจอ ลองเช็กรหัสห้อง หรือรอให้ผู้นำเสนอเปิดจอหลักก่อน'));
+      M.append(c); return;
+    }
+    const my = s.res && s.res[this.pid];
+    const openNow = this.canAnswer();
+    const key = [s.s, s.t, s.q, this.joined(), openNow, this.myAns[s.q], s.done, my && my.join(','), s.top && s.top.length].join('|');
+    if (key !== this.viewKey) { this.viewKey = key; this.build(M, s, my, openNow); }
+    this.renderTimer();
+  },
+  renderName(M) {
+    M.textContent = '';
+    const c = h('div', 'p-card');
+    c.append(h('div', 'p-big', '⚔️'), h('h2', null, 'ตั้งชื่อนักผจญภัย'), h('p', null, 'ชื่อนี้จะขึ้นบนจอใหญ่และกระดานคะแนน'));
+    const inp = h('input', 'p-input'); inp.maxLength = 16; inp.placeholder = 'เช่น อัศวินนอนดึก'; inp.autocomplete = 'off';
+    const go = h('button', 'btn p-go', 'เข้ากิลด์ →');
+    const submit = () => { const nm = cleanName(inp.value); if (!nm) { inp.focus(); return; } this.name = nm; this.save(); this.lastJoin = Date.now(); this.send({ k: 'join' }); this.viewKey = ''; this.render(); };
+    go.onclick = submit; inp.onkeydown = e => { if (e.key === 'Enter') submit(); };
+    c.append(inp, go); M.append(c);
+    setTimeout(() => inp.focus(), 50);
+  },
+  build(M, s, my, openNow) {
+    M.textContent = '';
+    const card = (big, title, text, cls) => { const c = h('div', 'p-card' + (cls ? ' ' + cls : '')); if (big) c.append(h('div', 'p-big', big)); if (title) c.append(h('h2', null, title)); if (text) c.append(h('p', null, text)); M.append(c); return c; };
+    if (!this.joined() && s.t === 'lobby') { card('📨', 'กำลังส่งชื่อเข้ากิลด์…', 'รอสักครู่'); return; }
+    if (s.t === 'lobby') { card('✅', 'เข้ากิลด์แล้ว!', 'รอผู้นำเสนอเริ่มภารกิจแรก ดูชื่อตัวเองบนจอใหญ่ได้เลย'); return; }
+    if (s.t === 'legend') { card('🗺️', 'ดูแผนที่กิลด์บนจอใหญ่', 'หมู่บ้าน = Client, ถนน = Network, กิลด์ = Server, คลัง = Database เดี๋ยวจะให้ทายแล้ว!'); return; }
+    if (s.t === 'quest') {
+      const head = h('div', 'p-card'); head.append(h('h2', null, s.title || ''), h('p', null, s.need || '')); M.append(head);
+      const mine = this.myAns[s.q];
+      if (mine) { card(CHOICE[mine].icon, 'ล็อกคำตอบแล้ว: ' + CHOICE[mine].label, 'ดูผลการแข่งบนจอใหญ่'); return; }
+      if (!openNow) { card('⌛', 'หมดเวลาทาย', 'รอบนี้ไม่ทันแล้ว รอรอบหน้านะ'); return; }
+      M.append(h('div', 'p-timer', '')); M.lastChild.id = 'pTimer';
+      M.append(h('div', 'p-timer', 'ใครจะทำภารกิจนี้เสร็จก่อน?'));
+      const G = h('div', 'choices');
+      for (const c of ['rest', 'gql', 'tie']) {
+        const b = h('button', 'choice ' + c); const tx = h('span'); tx.append(document.createTextNode(CHOICE[c].label), h('small', null, CHOICE[c].sub));
+        b.append(h('span', 'ic', CHOICE[c].icon), tx); b.onclick = () => this.answer(c); G.append(b);
+      }
+      M.append(G); return;
+    }
+    if (s.t === 'race') {
+      const mine = this.myAns[s.q];
+      if (!s.done) { card('⚔️', 'กำลังแข่ง!', 'ดูจอใหญ่เลย' + (mine ? ' · คุณทาย ' + CHOICE[mine].label : '')); return; }
+      if (!my || my[2] === -1) { card('🙈', 'รอบนี้ไม่ได้ทาย', 'คำตอบคือ ' + CHOICE[s.correct].label + (my ? ` · รวม ${my[0].toLocaleString()} คะแนน อันดับ ${my[3]}/${s.total}` : '')); return; }
+      const ok = my[2] === 1;
+      const c = card(ok ? '🎉' : '💥', ok ? 'ทายถูก!' : 'พลาดไปนิด', 'คำตอบคือ ' + CHOICE[s.correct].label, 'p-res ' + (ok ? 'ok' : 'bad'));
+      c.append(h('div', 'p-score', ok ? '+' + my[1].toLocaleString() : '+0'), h('div', 'p-rank', `รวม ${my[0].toLocaleString()} คะแนน · อันดับ ${my[3]} / ${s.total}`));
+      return;
+    }
+    if (s.t === 'mini' || s.t === 'takeaway') { const c = card('🏆', my ? `อันดับ ${my[3]} / ${s.total}` : 'ดูจอใหญ่', my ? `คะแนนรวม ${my[0].toLocaleString()}` : ''); return; }
+    if (s.t === 'podium') {
+      const c = card(my && my[3] <= 3 ? ['🥇', '🥈', '🥉'][my[3] - 1] : '🏅', my ? `คุณได้อันดับ ${my[3]} จาก ${s.total}` : 'จบภารกิจแล้ว!', my ? `คะแนนรวม ${my[0].toLocaleString()}` : '');
+      if (s.top && s.top.length) { const l = h('div'); l.style.marginTop = '12px'; s.top.forEach((t, i) => l.append(h('p', null, ['🥇', '🥈', '🥉'][i] + ' ' + t[0] + ' · ' + Number(t[1]).toLocaleString()))); c.append(l); }
+      c.append(h('p', null, 'ขอบคุณที่ร่วมผจญภัย! ⚔️'));
+    }
+  },
+  renderTimer() {
+    const el = document.getElementById('pTimer'); if (!el) return;
+    const left = Math.max(0, Math.ceil((this.deadline - Date.now()) / 1000));
+    el.textContent = ''; el.append(document.createTextNode('เหลือเวลา '), h('b', null, String(left)), document.createTextNode(' วินาที'));
+    if (left <= 0) { this.viewKey = ''; }
+  },
+};
+
+/* =====================================================================
+   LANDING + BOOT
+   ===================================================================== */
+const Landing = {
+  init() {
+    $('#landing').classList.remove('hidden');
+    const go = () => { const c = $('#landCode').value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4); if (c.length === 4) location.search = '?room=' + c; };
+    $('#landJoin').onclick = go; $('#landCode').onkeydown = e => { if (e.key === 'Enter') go(); };
+    $('#landHost').onclick = () => { location.search = '?host'; };
+  },
+};
+function boot() {
+  const p = new URLSearchParams(location.search);
+  if (p.has('host')) Host.init();
+  else if (p.get('room')) Player.init(p.get('room').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4));
+  else Landing.init();
+}
+Promise.race([document.fonts ? document.fonts.ready : Promise.resolve(), new Promise(r => setTimeout(r, 1500))]).then(boot);
+</script>
+</body>
+</html>
